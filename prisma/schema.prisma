@@ -1,0 +1,538 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// 1. NHÂN SỰ & PHÒNG BAN
+// ==========================================
+
+model Department {
+  id          String   @id @default(cuid())
+  code        String   @unique // DIRECTOR, ACCOUNTING, SALES, IT, MARKETING
+  name        String
+  description String?
+  headcount   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users             User[]
+  budgetRequests    BudgetRequest[]
+  departmentBudgets DepartmentBudget[]
+  transactions      Transaction[]
+  projects          Project[]
+  tasks             Task[]
+}
+
+model User {
+  id           String    @id @default(cuid())
+  employeeCode String    @unique // NDA-001 ... NDA-016
+  email        String    @unique
+  passwordHash String
+  fullName     String
+  phone        String?
+  avatar       String?
+  role         String    // ADMIN, ACCOUNTANT, SALES, IT, MARKETING
+  position     String    // Giám đốc, Kế toán trưởng, Nhân viên Sales, ...
+  isTeamLead      Boolean   @default(false) // Người phụ trách nhóm (không mặc nhiên có quyền duyệt tài chính/lương)
+  isActive        Boolean   @default(true)
+  employmentType  String    @default("FULL_TIME") // FULL_TIME, INTERN
+  university      String?   // Trường đang học (nếu là thực tập sinh)
+  internshipStart DateTime?
+  internshipEnd   DateTime?
+  mentorName      String?   // Người hướng dẫn thực tập
+  baseSalary      Float     @default(2000000)
+  allowance    Float     @default(0)
+  kpiTarget    Float     @default(0)
+  joinedAt     DateTime  @default(now())
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  attendances           Attendance[]
+  leaveRequests         LeaveRequest[]
+  leaveApprovals        LeaveRequest[]         @relation("LeaveApprover")
+  attendanceAdjustments AttendanceAdjustment[]
+  adjustmentApprovals   AttendanceAdjustment[] @relation("AdjustmentApprover")
+  payrolls              Payroll[]
+  customers             Customer[]
+  contracts             Contract[]
+  transactionsCreated   Transaction[]          @relation("TransactionCreator")
+  budgetRequestsCreated BudgetRequest[]        @relation("BudgetCreator")
+  approvalsCreated      Approval[]             @relation("ApprovalCreator")
+  approvalsChecked      Approval[]             @relation("ApprovalChecker")
+  approvalsApproved     Approval[]             @relation("ApprovalApprover")
+  tasksAssigned         Task[]                 @relation("TaskAssignee")
+  tasksCreated          Task[]                 @relation("TaskCreator")
+  projectsManaged       Project[]              @relation("ProjectManager")
+  devicesAssigned       Device[]
+  campaignsManaged      MarketingCampaign[]
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+}
+
+// ==========================================
+// 2. CHẤM CÔNG & NGHỈ PHÉP
+// ==========================================
+
+model Attendance {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  date         String    // YYYY-MM-DD
+  checkIn      DateTime?
+  checkOut     DateTime?
+  workHours    Float     @default(0)
+  overtimeHours Float    @default(0)
+  status       String    @default("PRESENT") // PRESENT, LATE, EARLY_LEAVE, ABSENT, LEAVE, HOLIDAY
+  isConfirmed  Boolean   @default(false) // Kế toán xác nhận
+  isLocked     Boolean   @default(false) // Chốt bảng công tháng
+  note         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  adjustments AttendanceAdjustment[]
+
+  @@unique([userId, date])
+}
+
+model LeaveRequest {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  leaveType  String    // ANNUAL, SICK, UNPAID, PERSONAL
+  startDate  String    // YYYY-MM-DD
+  endDate    String    // YYYY-MM-DD
+  days        Float
+  reason      String
+  evidenceUrl String?   // Hình ảnh minh chứng xin nghỉ phép
+  status      String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  approverId String?
+  approver   User?     @relation("LeaveApprover", fields: [approverId], references: [id])
+  reviewNote String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model AttendanceAdjustment {
+  id                String      @id @default(cuid())
+  userId            String
+  user              User        @relation(fields: [userId], references: [id])
+  attendanceId      String?
+  attendance        Attendance? @relation(fields: [attendanceId], references: [id])
+  date              String      // YYYY-MM-DD
+  requestedCheckIn  String?     // HH:mm
+  requestedCheckOut String?     // HH:mm
+  reason            String
+  status            String      @default("PENDING") // PENDING, APPROVED, REJECTED
+  approverId        String?
+  approver          User?       @relation("AdjustmentApprover", fields: [approverId], references: [id])
+  reviewNote        String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+// ==========================================
+// 3. LƯƠNG & CHÍNH SÁCH HOA HỒNG
+// ==========================================
+
+model CommissionPolicy {
+  id         String   @id @default(cuid())
+  name       String
+  minRevenue Float    // e.g. 0, 6000000, 12000000, 20000000
+  maxRevenue Float?   // null = unlimited
+  baseSalary Float    @default(2000000)
+  rate       Float    // 0.40, 0.45, 0.50, 0.60
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+}
+
+model SalaryPolicy {
+  id           String   @id @default(cuid())
+  departmentCode String
+  name         String
+  baseSalary   Float
+  allowance    Float    @default(0)
+  overtimeRate Float    @default(1.5)
+  description  String?
+  createdAt    DateTime @default(now())
+}
+
+model Payroll {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  month           Int
+  year            Int
+  workDays        Float    @default(22)
+  actualWorkDays  Float    @default(22)
+  baseSalary      Float    @default(0)
+  salesRevenue    Float    @default(0) // Doanh số công ty nhận từ HĐ của Sales
+  commissionRate  Float    @default(0) // 0.40, 0.45, 0.50, 0.60
+  commissionAmount Float   @default(0)
+  companyRetained Float    @default(0) // Phần công ty giữ lại = salesRevenue - totalIncome (cho Sales)
+  allowance       Float    @default(0)
+  bonus           Float    @default(0)
+  overtimePay     Float    @default(0)
+  deduction       Float    @default(0)
+  grossIncome     Float    @default(0) // Tổng thu nhập dự kiến
+  netSalary       Float    @default(0) // Thực nhận
+  status          String   @default("DRAFT") // DRAFT, CHECKED, APPROVED, PAID
+  note            String?
+  paidAt          DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  details PayrollDetail[]
+
+  @@unique([userId, month, year])
+}
+
+model PayrollDetail {
+  id        String   @id @default(cuid())
+  payrollId String
+  payroll   Payroll  @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+  title     String
+  type      String   // EARNING, DEDUCTION
+  amount    Float
+  note      String?
+  createdAt DateTime @default(now())
+}
+
+// ==========================================
+// 4. SALES, KHÁCH HÀNG, PHÒNG TRỌ & HỢP ĐỒNG
+// ==========================================
+
+model Customer {
+  id        String   @id @default(cuid())
+  fullName  String
+  phone     String
+  email     String?
+  idCard    String?
+  source    String   @default("FACEBOOK") // FACEBOOK, TIKTOK, ZALO, REFERRAL, WALK_IN
+  status    String   @default("POTENTIAL") // POTENTIAL, VIEWING, DEPOSITED, SIGNED, LOST
+  note      String?
+  salesId   String
+  sales     User     @relation(fields: [salesId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contracts Contract[]
+}
+
+model Property {
+  id           String   @id @default(cuid())
+  name         String
+  address      String
+  district     String
+  landlordName String
+  landlordPhone String
+  note         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  rooms Room[]
+}
+
+model Room {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id])
+  roomNumber String
+  floor      Int      @default(1)
+  area       Float    @default(25)
+  price      Float
+  status     String   @default("AVAILABLE") // AVAILABLE, RESERVED, RENTED, MAINTENANCE
+  amenities  String?
+  imageUrl   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  contracts Contract[]
+}
+
+model Contract {
+  id                   String   @id @default(cuid())
+  contractCode         String   @unique // HD-2026-001
+  customerId           String
+  customer             Customer @relation(fields: [customerId], references: [id])
+  roomId               String
+  room                 Room     @relation(fields: [roomId], references: [id])
+  salesId              String
+  sales                User     @relation(fields: [salesId], references: [id])
+  durationMonths       Int      // 6 or 12
+  monthlyRent          Float
+  depositAmount        Float    // Tổng tiền cọc khách đóng
+  companyCommissionRate Float   // 0.50 cho 6 tháng; 0.70 - 1.00 cho 12 tháng
+  companyRevenue       Float    // Doanh thu công ty được hưởng = depositAmount * companyCommissionRate
+  landlordPayable      Float    // Tiền phải trả chủ trọ = depositAmount - companyRevenue
+  signedDate           DateTime @default(now())
+  startDate            DateTime
+  endDate              DateTime
+  status               String   @default("ACTIVE") // DRAFT, ACTIVE, COMPLETED, CANCELLED
+  invoiceUrl           String?  // Ảnh chụp hóa đơn / chứng từ thuê phòng
+  note                 String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  deposits Deposit[]
+}
+
+model Deposit {
+  id                   String    @id @default(cuid())
+  contractId           String
+  contract             Contract  @relation(fields: [contractId], references: [id])
+  totalDeposit         Float     // Tổng tiền cọc
+  collectedAmount      Float     @default(0) // Đã thu từ khách
+  remainingAmount      Float     @default(0) // Chưa thu
+  companyShare         Float     // Phần hoa hồng công ty
+  landlordShare        Float     // Phần thu hộ chủ trọ
+  landlordPaidAmount   Float     @default(0) // Đã thanh toán cho chủ trọ
+  collectionStatus     String    @default("UNPAID") // UNPAID, PARTIAL, COLLECTED
+  landlordPayoutStatus String    @default("UNPAID") // UNPAID, PARTIAL, PAID
+  collectedAt          DateTime?
+  landlordPaidAt       DateTime?
+  note                 String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+// ==========================================
+// 5. TÀI CHÍNH (THU - CHI - CÔNG NỢ)
+// ==========================================
+
+model Category {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  name         String
+  type         String        // INCOME, EXPENSE
+  description  String?
+  transactions Transaction[]
+}
+
+model Transaction {
+  id              String     @id @default(cuid())
+  code            String     @unique // TC-2026-001
+  type            String     // INCOME, EXPENSE
+  title           String
+  amount          Float
+  categoryId      String
+  category        Category   @relation(fields: [categoryId], references: [id])
+  departmentId    String
+  department      Department @relation(fields: [departmentId], references: [id])
+  createdById     String
+  createdBy       User       @relation("TransactionCreator", fields: [createdById], references: [id])
+  reason          String?
+  voucherUrl      String?    // Hóa đơn, chứng từ
+  approvalStatus  String     @default("APPROVED") // PENDING, CHECKED, APPROVED, REJECTED
+  paymentStatus   String     @default("PAID") // UNPAID, PAID
+  transactionDate DateTime   @default(now())
+  dueDate         DateTime?
+  isDebt          Boolean    @default(false) // Công nợ chưa thanh toán
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  paymentRecords PaymentRecord[]
+}
+
+model PaymentRecord {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  amount        Float
+  method        String      @default("BANK_TRANSFER") // CASH, BANK_TRANSFER
+  referenceNo   String?
+  paidAt        DateTime    @default(now())
+  note          String?
+}
+
+// ==========================================
+// 6. NGÂN SÁCH PHÒNG BAN & PHÊ DUYỆT
+// ==========================================
+
+model BudgetRequest {
+  id             String     @id @default(cuid())
+  code           String     @unique // NS-2026-001
+  departmentId   String
+  department     Department @relation(fields: [departmentId], references: [id])
+  createdById    String
+  createdBy      User       @relation("BudgetCreator", fields: [createdById], references: [id])
+  title          String
+  amount         Float
+  reason         String
+  periodStart    String     // YYYY-MM-DD
+  periodEnd      String     // YYYY-MM-DD
+  attachmentUrl  String?
+  status         String     @default("PENDING") // PENDING, TEAM_CHECKED, ACCOUNTANT_CHECKED, APPROVED, REJECTED, REVISION_REQUESTED
+  rejectReason   String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  departmentBudget DepartmentBudget?
+}
+
+model DepartmentBudget {
+  id              String         @id @default(cuid())
+  departmentId    String
+  department      Department     @relation(fields: [departmentId], references: [id])
+  budgetRequestId String?        @unique
+  budgetRequest   BudgetRequest? @relation(fields: [budgetRequestId], references: [id])
+  title           String
+  month           Int
+  year            Int
+  allocatedAmount Float
+  usedAmount      Float          @default(0)
+  status          String         @default("ACTIVE") // ACTIVE, EXCEEDED, CLOSED
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  expenses BudgetExpense[]
+}
+
+model BudgetExpense {
+  id                 String           @id @default(cuid())
+  departmentBudgetId String
+  departmentBudget   DepartmentBudget @relation(fields: [departmentBudgetId], references: [id], onDelete: Cascade)
+  title              String
+  amount             Float
+  expenseDate        DateTime         @default(now())
+  note               String?
+}
+
+model Approval {
+  id              String    @id @default(cuid())
+  code            String    @unique // DX-2026-001
+  type            String    // BUDGET, EXPENSE, PROCUREMENT, PROJECT, BUDGET_SUPPLEMENT, PAYMENT, SALARY_ADJUSTMENT
+  title           String
+  description     String
+  amount          Float     @default(0)
+  departmentCode  String
+  referenceId     String?   // ID tham chiếu tới BudgetRequest, Project, Transaction...
+  attachmentUrl   String?
+  createdById     String
+  createdBy       User      @relation("ApprovalCreator", fields: [createdById], references: [id])
+  checkerId       String?
+  checker         User?     @relation("ApprovalChecker", fields: [checkerId], references: [id])
+  checkedAt       DateTime?
+  checkerNote     String?
+  approverId      String?
+  approver        User?     @relation("ApprovalApprover", fields: [approverId], references: [id])
+  approvedAt      DateTime?
+  rejectReason    String?
+  status          String    @default("PENDING") // PENDING, ACCOUNTANT_CHECKED, APPROVED, REJECTED, REVISION_REQUESTED, PAID
+  history         String    @default("[]") // JSON lịch sử thay đổi
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ==========================================
+// 7. CÔNG VIỆC, DỰ ÁN, THIẾT BỊ IT & MARKETING
+// ==========================================
+
+model Project {
+  id             String     @id @default(cuid())
+  code           String     @unique // PRJ-2026-001
+  name           String
+  description    String?
+  departmentId   String
+  department     Department @relation(fields: [departmentId], references: [id])
+  managerId      String
+  manager        User       @relation("ProjectManager", fields: [managerId], references: [id])
+  budget         Float      @default(0)
+  actualCost     Float      @default(0)
+  progress       Int        @default(0) // 0 - 100
+  status         String     @default("IN_PROGRESS") // PENDING_APPROVAL, IN_PROGRESS, COMPLETED, ON_HOLD
+  startDate      DateTime   @default(now())
+  endDate        DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  tasks Task[]
+}
+
+model Task {
+  id           String     @id @default(cuid())
+  title        String
+  description  String?
+  priority     String     @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  status       String     @default("TODO") // TODO, IN_PROGRESS, REVIEW, DONE
+  dueDate      DateTime?
+  projectId    String?
+  project      Project?   @relation(fields: [projectId], references: [id])
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  assigneeId   String
+  assignee     User       @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdById  String
+  createdBy    User       @relation("TaskCreator", fields: [createdById], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Device {
+  id           String   @id @default(cuid())
+  code         String   @unique // DEV-001
+  name         String
+  category     String   // LAPTOP, MONITOR, NETWORK, SERVER, OTHER
+  serialNumber String?
+  purchaseCost Float    @default(0)
+  purchaseDate DateTime @default(now())
+  status       String   @default("IN_USE") // IN_USE, AVAILABLE, MAINTENANCE, RETIRED
+  assignedToId String?
+  assignedTo   User?    @relation(fields: [assignedToId], references: [id])
+  note         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model MarketingCampaign {
+  id          String   @id @default(cuid())
+  code        String   @unique // MKT-2026-001
+  name        String
+  channel     String   // FACEBOOK_ADS, TIKTOK_ADS, GOOGLE_ADS, CONTENT, SEO
+  budget      Float    @default(0)
+  spent       Float    @default(0)
+  leadsCount  Int      @default(0)
+  conversions Int      @default(0)
+  status      String   @default("RUNNING") // DRAFT, RUNNING, PAUSED, COMPLETED
+  startDate   DateTime @default(now())
+  endDate     DateTime?
+  managerId   String
+  manager     User     @relation(fields: [managerId], references: [id])
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ==========================================
+// 8. HỆ THỐNG (THÔNG BÁO & AUDIT LOG)
+// ==========================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  type      String   @default("INFO") // INFO, SUCCESS, WARNING, ALERT
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String   // LOGIN, CREATE, UPDATE, DELETE, APPROVE, REJECT, LOCK_PAYROLL, ...
+  entity    String   // Contract, Transaction, Payroll, Approval, ...
+  entityId  String?
+  details   String?
+  createdAt DateTime @default(now())
+}
