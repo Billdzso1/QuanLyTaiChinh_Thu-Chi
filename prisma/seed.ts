@@ -181,6 +181,22 @@ async function main() {
     mktUsers.push(u);
   }
 
+  // Chủ trọ / Đối tác demo (NDA-017)
+  await prisma.user.create({
+    data: {
+      employeeCode: "NDA-017",
+      email: "chutro@ndahome.vn",
+      passwordHash,
+      fullName: "Ông Trần Văn Hùng (Chủ trọ)",
+      phone: "0912345678",
+      role: "LANDLORD",
+      position: "Chủ trọ / Đối tác",
+      baseSalary: 0,
+      allowance: 0,
+      departmentId: deptDirector.id,
+    },
+  });
+
   // 3. Commission & Salary Policies
   await prisma.commissionPolicy.createMany({
     data: [
