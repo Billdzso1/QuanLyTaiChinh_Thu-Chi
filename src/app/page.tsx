@@ -33,6 +33,7 @@ import {
 } from "recharts";
 
 interface DashboardData {
+  hideCompanyRevenue?: boolean;
   kpis: {
     totalRevenue: number;
     totalExpense: number;
@@ -145,73 +146,75 @@ export default function DashboardPage() {
           </div>
         ) : (
           <>
-            {/* 8 KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <KpiCard
-                title="Tổng doanh thu"
-                value={formatVND(data.kpis.totalRevenue)}
-                icon={<TrendingUp className="w-5 h-5 text-emerald-700" />}
-                bg="bg-emerald-100"
-                accent="border-l-4 border-l-emerald-500 bg-gradient-to-br from-white to-emerald-50/70"
-                highlight="text-emerald-700"
-              />
-              <KpiCard
-                title="Tổng chi phí"
-                value={formatVND(data.kpis.totalExpense)}
-                icon={<TrendingDown className="w-5 h-5 text-rose-700" />}
-                bg="bg-rose-100"
-                accent="border-l-4 border-l-rose-500 bg-gradient-to-br from-white to-rose-50/70"
-                highlight="text-rose-700"
-              />
-              <KpiCard
-                title="Lợi nhuận ròng"
-                value={formatVND(data.kpis.profit)}
-                icon={<BadgeDollarSign className="w-5 h-5 text-amber-700" />}
-                bg="bg-amber-100"
-                accent="border-l-4 border-l-amber-500 bg-gradient-to-br from-white to-amber-50/80"
-                highlight={data.kpis.profit >= 0 ? "text-amber-700" : "text-rose-700"}
-              />
-              <KpiCard
-                title="Số dư tiền thực tế"
-                value={formatVND(data.kpis.cashBalance)}
-                icon={<Wallet className="w-5 h-5 text-sky-700" />}
-                bg="bg-sky-100"
-                accent="border-l-4 border-l-sky-500 bg-gradient-to-br from-white to-sky-50/70"
-                highlight="text-sky-700"
-              />
-              <KpiCard
-                title="Lương phải trả (T11)"
-                value={formatVND(data.kpis.totalPayrollPayable)}
-                icon={<BadgeDollarSign className="w-5 h-5 text-yellow-700" />}
-                bg="bg-yellow-100"
-                accent="border-l-4 border-l-yellow-500 bg-gradient-to-br from-white to-yellow-50/70"
-                highlight="text-yellow-800"
-              />
-              <KpiCard
-                title="Công nợ & Phải trả chủ trọ"
-                value={formatVND(data.kpis.totalDebt)}
-                icon={<AlertTriangle className="w-5 h-5 text-orange-700" />}
-                bg="bg-orange-100"
-                accent="border-l-4 border-l-orange-500 bg-gradient-to-br from-white to-orange-50/70"
-                highlight="text-orange-700"
-              />
-              <KpiCard
-                title="Ngân sách đã duyệt"
-                value={formatVND(data.kpis.approvedBudget)}
-                icon={<PiggyBank className="w-5 h-5 text-violet-700" />}
-                bg="bg-violet-100"
-                accent="border-l-4 border-l-violet-500 bg-gradient-to-br from-white to-violet-50/70"
-                highlight="text-violet-700"
-              />
-              <KpiCard
-                title="Ngân sách đã sử dụng"
-                value={formatVND(data.kpis.usedBudget)}
-                icon={<PiggyBank className="w-5 h-5 text-teal-700" />}
-                bg="bg-teal-100"
-                accent="border-l-4 border-l-teal-500 bg-gradient-to-br from-white to-teal-50/70"
-                highlight="text-teal-700"
-              />
-            </div>
+            {/* 8 KPI Cards (ẩn doanh thu/tài chính công ty đối với Sales) */}
+            {!data.hideCompanyRevenue && userRole !== "SALES" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <KpiCard
+                  title="Tổng doanh thu"
+                  value={formatVND(data.kpis.totalRevenue)}
+                  icon={<TrendingUp className="w-5 h-5 text-emerald-700" />}
+                  bg="bg-emerald-100"
+                  accent="border-l-4 border-l-emerald-500 bg-gradient-to-br from-white to-emerald-50/70"
+                  highlight="text-emerald-700"
+                />
+                <KpiCard
+                  title="Tổng chi phí"
+                  value={formatVND(data.kpis.totalExpense)}
+                  icon={<TrendingDown className="w-5 h-5 text-rose-700" />}
+                  bg="bg-rose-100"
+                  accent="border-l-4 border-l-rose-500 bg-gradient-to-br from-white to-rose-50/70"
+                  highlight="text-rose-700"
+                />
+                <KpiCard
+                  title="Lợi nhuận ròng"
+                  value={formatVND(data.kpis.profit)}
+                  icon={<BadgeDollarSign className="w-5 h-5 text-amber-700" />}
+                  bg="bg-amber-100"
+                  accent="border-l-4 border-l-amber-500 bg-gradient-to-br from-white to-amber-50/80"
+                  highlight={data.kpis.profit >= 0 ? "text-amber-700" : "text-rose-700"}
+                />
+                <KpiCard
+                  title="Số dư tiền thực tế"
+                  value={formatVND(data.kpis.cashBalance)}
+                  icon={<Wallet className="w-5 h-5 text-sky-700" />}
+                  bg="bg-sky-100"
+                  accent="border-l-4 border-l-sky-500 bg-gradient-to-br from-white to-sky-50/70"
+                  highlight="text-sky-700"
+                />
+                <KpiCard
+                  title="Lương phải trả (T11)"
+                  value={formatVND(data.kpis.totalPayrollPayable)}
+                  icon={<BadgeDollarSign className="w-5 h-5 text-yellow-700" />}
+                  bg="bg-yellow-100"
+                  accent="border-l-4 border-l-yellow-500 bg-gradient-to-br from-white to-yellow-50/70"
+                  highlight="text-yellow-800"
+                />
+                <KpiCard
+                  title="Công nợ & Phải trả chủ trọ"
+                  value={formatVND(data.kpis.totalDebt)}
+                  icon={<AlertTriangle className="w-5 h-5 text-orange-700" />}
+                  bg="bg-orange-100"
+                  accent="border-l-4 border-l-orange-500 bg-gradient-to-br from-white to-orange-50/70"
+                  highlight="text-orange-700"
+                />
+                <KpiCard
+                  title="Ngân sách đã duyệt"
+                  value={formatVND(data.kpis.approvedBudget)}
+                  icon={<PiggyBank className="w-5 h-5 text-violet-700" />}
+                  bg="bg-violet-100"
+                  accent="border-l-4 border-l-violet-500 bg-gradient-to-br from-white to-violet-50/70"
+                  highlight="text-violet-700"
+                />
+                <KpiCard
+                  title="Ngân sách đã sử dụng"
+                  value={formatVND(data.kpis.usedBudget)}
+                  icon={<PiggyBank className="w-5 h-5 text-teal-700" />}
+                  bg="bg-teal-100"
+                  accent="border-l-4 border-l-teal-500 bg-gradient-to-br from-white to-teal-50/70"
+                  highlight="text-teal-700"
+                />
+              </div>
+            )}
 
             {/* Bảng vàng Top 3 KPI toàn công ty + hiệu ứng pháo hoa */}
             {data.topKpi && data.topKpi.length > 0 && <TopKpiPodium topKpi={data.topKpi} />}
@@ -221,16 +224,22 @@ export default function DashboardPage() {
               <h2 className="text-base font-semibold text-neutral-900 mb-3">Thông tin cần chú ý</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 <AlertTile label="Đề xuất chờ duyệt" count={data.alerts.pendingApprovals} href="/approvals" color="amber" />
-                <AlertTile label="Dự án cần duyệt" count={data.alerts.pendingProjects} href="/it" color="violet" />
-                <AlertTile label="Vượt ngân sách" count={data.alerts.overBudgetCount} href="/budgets" color="rose" />
-                <AlertTile label="Công nợ chưa trả" count={data.alerts.unpaidDebtsCount} href="/finance" color="orange" />
-                <AlertTile label="Bảng lương chưa duyệt" count={data.alerts.unapprovedPayrolls} href="/payroll" color="sky" />
+                {!data.hideCompanyRevenue && userRole !== "SALES" && (
+                  <>
+                    <AlertTile label="Dự án cần duyệt" count={data.alerts.pendingProjects} href="/it" color="violet" />
+                    <AlertTile label="Vượt ngân sách" count={data.alerts.overBudgetCount} href="/budgets" color="rose" />
+                    <AlertTile label="Công nợ chưa trả" count={data.alerts.unpaidDebtsCount} href="/finance" color="orange" />
+                    <AlertTile label="Bảng lương chưa duyệt" count={data.alerts.unapprovedPayrolls} href="/payroll" color="sky" />
+                  </>
+                )}
                 <AlertTile label="Đi muộn gần nhất" count={data.alerts.lateAttendanceToday} href="/attendance" color="emerald" />
               </div>
             </div>
 
-            {/* Charts Row 1 */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Charts Row 1 (ẩn biểu đồ tài chính công ty đối với Sales) */}
+            {!data.hideCompanyRevenue && userRole !== "SALES" && (
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-white rounded-xl border border-neutral-200 p-5">
                 <h3 className="text-base font-semibold text-neutral-900 mb-4">
                   Doanh thu, Chi phí & Lợi nhuận theo tháng
@@ -356,6 +365,8 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+              </>
+            )}
 
             {/* Quick Personal Bar */}
             <div className="bg-neutral-950 text-white border border-amber-500/40 rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 no-print">

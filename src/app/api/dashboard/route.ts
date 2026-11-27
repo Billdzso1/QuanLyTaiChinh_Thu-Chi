@@ -142,26 +142,51 @@ export async function GET() {
     lateAttendanceToday: attendances.filter((a) => a.status === "LATE").length,
   };
 
+  const isSalesRole = user.role === "SALES";
+
   return NextResponse.json({
-    kpis: {
-      totalRevenue,
-      totalExpense,
-      profit,
-      cashBalance,
-      totalPayrollPayable,
-      totalDebt,
-      approvedBudget,
-      usedBudget,
-    },
-    charts: {
-      monthlyChart,
-      expenseByDept,
-      contractDurationChart,
-      salesChart,
-    },
-    topKpi,
+    hideCompanyRevenue: isSalesRole,
+    kpis: isSalesRole
+      ? {
+          totalRevenue: 0,
+          totalExpense: 0,
+          profit: 0,
+          cashBalance: 0,
+          totalPayrollPayable: 0,
+          totalDebt: 0,
+          approvedBudget: 0,
+          usedBudget: 0,
+        }
+      : {
+          totalRevenue,
+          totalExpense,
+          profit,
+          cashBalance,
+          totalPayrollPayable,
+          totalDebt,
+          approvedBudget,
+          usedBudget,
+        },
+    charts: isSalesRole
+      ? {
+          monthlyChart: [],
+          expenseByDept: [],
+          contractDurationChart: [],
+          salesChart: salesChart.filter((s) => s.name === user.fullName),
+        }
+      : {
+          monthlyChart,
+          expenseByDept,
+          contractDurationChart,
+          salesChart,
+        },
+    topKpi: isSalesRole
+      ? topKpi.map((m) => ({ ...m, revenue: m.id === user.id ? m.revenue : 0 }))
+      : topKpi,
     alerts,
-    pendingApprovalsList: approvals.slice(0, 5),
-    overBudgetList: budgets.filter((b) => b.usedAmount > b.allocatedAmount || b.status === "EXCEEDED"),
+    pendingApprovalsList: isSalesRole ? [] : approvals.slice(0, 5),
+    overBudgetList: isSalesRole
+      ? []
+      : budgets.filter((b) => b.usedAmount > b.allocatedAmount || b.status === "EXCEEDED"),
   });
 }

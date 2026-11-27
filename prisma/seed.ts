@@ -275,18 +275,18 @@ async function main() {
 
   const rooms = [];
   const roomConfigs = [
-    { propId: prop1.id, num: "P101", price: 5_500_000, status: "RENTED" },
-    { propId: prop1.id, num: "P102", price: 6_000_000, status: "RENTED" },
-    { propId: prop1.id, num: "P201", price: 6_500_000, status: "AVAILABLE" },
-    { propId: prop1.id, num: "P202", price: 5_800_000, status: "RENTED" },
-    { propId: prop2.id, num: "P301", price: 7_500_000, status: "RENTED" },
-    { propId: prop2.id, num: "P302", price: 8_000_000, status: "RENTED" },
-    { propId: prop2.id, num: "P303", price: 7_000_000, status: "RESERVED" },
-    { propId: prop2.id, num: "P401", price: 8_500_000, status: "AVAILABLE" },
-    { propId: prop3.id, num: "P101", price: 6_200_000, status: "RENTED" },
-    { propId: prop3.id, num: "P102", price: 6_800_000, status: "RENTED" },
-    { propId: prop3.id, num: "P201", price: 7_200_000, status: "RENTED" },
-    { propId: prop3.id, num: "P202", price: 6_500_000, status: "AVAILABLE" },
+    { propId: prop1.id, num: "P101", price: 5_500_000, status: "RENTED", img: "/phongtro01.png" },
+    { propId: prop1.id, num: "P102", price: 6_000_000, status: "RENTED", img: "/phongtro02.jpg" },
+    { propId: prop1.id, num: "P201", price: 6_500_000, status: "AVAILABLE", img: "/phongtro03.jfif" },
+    { propId: prop1.id, num: "P202", price: 5_800_000, status: "RENTED", img: "/phongtro04.jfif" },
+    { propId: prop2.id, num: "P301", price: 7_500_000, status: "RENTED", img: "/phongtro05.jfif" },
+    { propId: prop2.id, num: "P302", price: 8_000_000, status: "RENTED", img: "/phongtro06.jfif" },
+    { propId: prop2.id, num: "P303", price: 7_000_000, status: "RESERVED", img: "/phongtro07.jfif" },
+    { propId: prop2.id, num: "P401", price: 8_500_000, status: "AVAILABLE", img: "/phongtro08.jpg" },
+    { propId: prop3.id, num: "P101", price: 6_200_000, status: "RENTED", img: "/phongtro09.jfif" },
+    { propId: prop3.id, num: "P102", price: 6_800_000, status: "RENTED", img: "/phongtro10.jpg" },
+    { propId: prop3.id, num: "P201", price: 7_200_000, status: "RENTED", img: "/phongtro11.jfif" },
+    { propId: prop3.id, num: "P202", price: 6_500_000, status: "AVAILABLE", img: "/phongtro12.jfif" },
   ];
   for (const rc of roomConfigs) {
     rooms.push(
@@ -296,6 +296,7 @@ async function main() {
           roomNumber: rc.num,
           price: rc.price,
           status: rc.status,
+          imageUrl: rc.img,
           amenities: "Máy lạnh, tủ lạnh, máy giặt chung, wifi tốc độ cao",
         },
       })

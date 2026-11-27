@@ -4,7 +4,33 @@ import React, { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { formatVND, formatDate } from "@/lib/finance";
 import { ROLE_VI_LABELS } from "@/lib/labels";
-import { Users, Shield, Plus, Clock, GraduationCap, Upload, X, Search, CheckCircle2, UserX } from "lucide-react";
+import {
+  Users,
+  Shield,
+  Plus,
+  Clock,
+  GraduationCap,
+  Upload,
+  X,
+  Search,
+  CheckCircle2,
+  UserX,
+  Lock,
+  Unlock,
+  RotateCcw,
+  Save,
+  KeyRound,
+} from "lucide-react";
+import {
+  PERMISSION_MODULES,
+  PERMISSION_ROLES,
+  PermissionAction,
+  PermissionSet,
+  RoleKey,
+  ModuleKey,
+  RolePermissionMatrix,
+  getDefaultPermissionMatrix,
+} from "@/lib/permissions";
 
 interface Employee {
   id: string;
@@ -58,6 +84,16 @@ export default function EmployeesPage() {
   const [detailAttendances, setDetailAttendances] = useState<AttendanceDetail[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  const [mainTab, setMainTab] = useState<"EMPLOYEES" | "PERMISSIONS">("EMPLOYEES");
+  const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
+  const [permMatrix, setPermMatrix] = useState<RolePermissionMatrix>(() => getDefaultPermissionMatrix());
+  const [userOverrides, setUserOverrides] = useState<
+    Record<string, Partial<Record<ModuleKey, PermissionSet>>>
+  >({});
+  const [savingPerms, setSavingPerms] = useState(false);
+  const [permMessage, setPermMessage] = useState("");
+  const [permUserModal, setPermUserModal] = useState<Employee | null>(null);
+
   const [form, setForm] = useState({
     employeeCode: "NDA-017",
     email: "",
@@ -78,14 +114,27 @@ export default function EmployeesPage() {
   });
 
   async function loadData() {
-    const res = await fetch("/api/employees");
-    if (res.ok) {
-      const d = await res.json();
+    const [empRes, meRes, permRes] = await Promise.all([
+      fetch("/api/employees"),
+      fetch("/api/auth/me"),
+      fetch("/api/permissions"),
+    ]);
+    if (empRes.ok) {
+      const d = await empRes.json();
       setUsers(d.users);
       setDepartments(d.departments);
       if (d.departments?.length && !form.departmentId) {
         setForm((f) => ({ ...f, departmentId: d.departments[0].id }));
       }
+    }
+    if (meRes.ok) {
+      const m = await meRes.json();
+      if (m.user) setCurrentUser({ id: m.user.id, role: m.user.role });
+    }
+    if (permRes.ok) {
+      const p = await permRes.json();
+      if (p.matrix) setPermMatrix(p.matrix);
+      if (p.userOverrides) setUserOverrides(p.userOverrides);
     }
   }
 
@@ -188,6 +237,87 @@ export default function EmployeesPage() {
     }
   }
 
+  async function handleToggleLock(u: Employee) {
+    const nextActive = !u.isActive;
+    const actionLabel = nextActive ? "mở khóa" : "khóa";
+    if (!window.confirm(`Xác nhận ${actionLabel} tài khoản của ${u.fullName} (${u.email})?`)) return;
+    const res = await fetch("/api/employees", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: u.id, isActive: nextActive }),
+    });
+    if (res.ok) {
+      loadData();
+    }
+  }
+
+  function toggleRolePerm(role: RoleKey, mod: ModuleKey, action: PermissionAction) {
+    setPermMatrix((prev) => ({
+      ...prev,
+      [role]: {
+        ...prev[role],
+        [mod]: {
+          ...prev[role][mod],
+          [action]: !prev[role][mod][action],
+        },
+      },
+    }));
+  }
+
+  function toggleRoleAllForModule(role: RoleKey, mod: ModuleKey) {
+    setPermMatrix((prev) => {
+      const cur = prev[role][mod];
+      const allOn = cur.view && cur.create && cur.edit && cur.delete;
+      const nextVal = !allOn;
+      return {
+        ...prev,
+        [role]: {
+          ...prev[role],
+          [mod]: { view: nextVal, create: nextVal, edit: nextVal, delete: nextVal },
+        },
+      };
+    });
+  }
+
+  function toggleUserOverridePerm(userId: string, role: RoleKey, mod: ModuleKey, action: PermissionAction) {
+    setUserOverrides((prev) => {
+      const userMap = prev[userId] || {};
+      const base = userMap[mod] || permMatrix[role]?.[mod] || { view: false, create: false, edit: false, delete: false };
+      return {
+        ...prev,
+        [userId]: {
+          ...userMap,
+          [mod]: {
+            ...base,
+            [action]: !base[action],
+          },
+        },
+      };
+    });
+  }
+
+  async function savePermissions(targetUserId?: string) {
+    setSavingPerms(true);
+    setPermMessage("");
+    const res = await fetch("/api/permissions", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        matrix: permMatrix,
+        userOverrides,
+        userId: targetUserId,
+      }),
+    });
+    setSavingPerms(false);
+    if (res.ok) {
+      setPermMessage("Đã lưu cấu hình phân quyền thành công!");
+      setTimeout(() => setPermMessage(""), 3000);
+    } else {
+      const d = await res.json();
+      setPermMessage(d.error || "Không thể lưu phân quyền");
+    }
+  }
+
   const pendingUsers = users.filter((u) => !u.isActive);
   const fullTimeCount = users.filter((u) => u.employmentType !== "INTERN").length;
   const internCount = users.filter((u) => u.employmentType === "INTERN").length;
@@ -219,13 +349,161 @@ export default function EmployeesPage() {
               {fullTimeCount} nhân viên chính thức • {internCount} thực tập sinh thuộc {departments.length} phòng ban
             </p>
           </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-2 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Thêm nhân sự / Thực tập sinh
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {currentUser?.role === "ADMIN" && (
+              <div className="inline-flex rounded-xl bg-neutral-100 p-1 border border-neutral-200">
+                <button
+                  onClick={() => setMainTab("EMPLOYEES")}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 ${
+                    mainTab === "EMPLOYEES"
+                      ? "bg-neutral-950 text-amber-400 shadow-sm"
+                      : "text-neutral-600 hover:text-neutral-900"
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" /> Nhân sự &amp; Khóa TK
+                </button>
+                <button
+                  onClick={() => setMainTab("PERMISSIONS")}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 ${
+                    mainTab === "PERMISSIONS"
+                      ? "bg-neutral-950 text-amber-400 shadow-sm"
+                      : "text-neutral-600 hover:text-neutral-900"
+                  }`}
+                >
+                  <Shield className="w-3.5 h-3.5" /> Ma trận Phân quyền
+                </button>
+              </div>
+            )}
+            <button
+              onClick={() => setShowModal(true)}
+              className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-2 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Thêm nhân sự / Thực tập sinh
+            </button>
+          </div>
         </div>
+
+        {mainTab === "PERMISSIONS" && currentUser?.role === "ADMIN" ? (
+          <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm">
+            <div className="px-5 py-4 border-b border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-amber-50/70 to-white">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center shrink-0">
+                  <Shield className="w-5 h-5 text-amber-700" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-neutral-900">Ma trận Phân quyền (Permission Matrix)</h2>
+                  <p className="text-xs text-neutral-500">
+                    Bật/tắt 4 mức quyền (Xem • Thêm • Sửa • Xóa) cho từng vai trò / phòng ban.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {permMessage && (
+                  <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                    {permMessage}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPermMatrix(getDefaultPermissionMatrix())}
+                  className="px-3 py-1.5 rounded-lg border border-neutral-300 hover:bg-neutral-50 text-xs font-medium text-neutral-700 inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Mặc định
+                </button>
+                <button
+                  type="button"
+                  disabled={savingPerms}
+                  onClick={() => savePermissions()}
+                  className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-neutral-950 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Save className="w-3.5 h-3.5" /> {savingPerms ? "Đang lưu..." : "Lưu cấu hình phân quyền"}
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-neutral-50 border-b border-neutral-200">
+                    <th className="px-4 py-3 text-xs font-bold uppercase text-neutral-500 min-w-[210px]">
+                      Phân hệ &amp; Chức năng
+                    </th>
+                    {PERMISSION_ROLES.map((r) => (
+                      <th key={r.key} className="px-3 py-3 text-center min-w-[155px]">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold border ${r.badgeClass}`}
+                        >
+                          {r.label}
+                        </span>
+                        <div className="text-[10px] font-normal text-neutral-500 mt-1">{r.desc}</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100">
+                  {PERMISSION_MODULES.map((m) => (
+                    <tr key={m.key} className="hover:bg-amber-50/20">
+                      <td className="px-4 py-3 align-top">
+                        <div className="font-bold text-sm text-neutral-900">{m.label}</div>
+                        <div className="text-[11px] text-neutral-500 mt-0.5">{m.desc}</div>
+                      </td>
+                      {PERMISSION_ROLES.map((r) => {
+                        const cell = permMatrix[r.key]?.[m.key] || {
+                          view: false,
+                          create: false,
+                          edit: false,
+                          delete: false,
+                        };
+                        const allOn = cell.view && cell.create && cell.edit && cell.delete;
+                        return (
+                          <td key={r.key} className="px-2.5 py-3 align-top">
+                            <div className="grid grid-cols-2 gap-1.5 max-w-[140px] mx-auto">
+                              {(
+                                [
+                                  { k: "view", label: "Xem", on: "bg-emerald-50 text-emerald-700 border-emerald-300" },
+                                  { k: "create", label: "Thêm", on: "bg-amber-50 text-amber-800 border-amber-300" },
+                                  { k: "edit", label: "Sửa", on: "bg-sky-50 text-sky-700 border-sky-300" },
+                                  { k: "delete", label: "Xóa", on: "bg-rose-50 text-rose-700 border-rose-300" },
+                                ] as const
+                              ).map((btn) => {
+                                const active = cell[btn.k];
+                                return (
+                                  <button
+                                    key={btn.k}
+                                    type="button"
+                                    onClick={() => toggleRolePerm(r.key, m.key, btn.k)}
+                                    className={`px-2 py-1 rounded-md text-[11px] font-semibold border transition-colors cursor-pointer ${
+                                      active
+                                        ? btn.on
+                                        : "bg-white text-neutral-400 border-neutral-200 hover:bg-neutral-50"
+                                    }`}
+                                  >
+                                    {active ? "✓ " : ""}
+                                    {btn.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <div className="text-center mt-1.5">
+                              <button
+                                type="button"
+                                onClick={() => toggleRoleAllForModule(r.key, m.key)}
+                                className="text-[10px] font-medium text-neutral-500 hover:text-amber-700 cursor-pointer"
+                              >
+                                {allOn ? "Tắt hết" : "Bật toàn quyền"}
+                              </button>
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <>
 
         {/* Tài khoản mới đăng ký chờ Admin duyệt */}
         {pendingUsers.length > 0 && (
@@ -330,14 +608,14 @@ export default function EmployeesPage() {
                   <th className="px-4 py-3">Họ và tên / Thông tin</th>
                   <th className="px-4 py-3">Loại hình</th>
                   <th className="px-4 py-3">Phòng ban</th>
-                  <th className="px-4 py-3">Nhóm quyền</th>
+                  <th className="px-4 py-3">Nhóm quyền / Trạng thái</th>
                   <th className="px-4 py-3 text-right">Lương / Trợ cấp</th>
-                  <th className="px-4 py-3 text-right">Chi tiết chấm công</th>
+                  <th className="px-4 py-3 text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {filteredUsers.map((u) => (
-                  <tr key={u.id} className="hover:bg-neutral-50">
+                  <tr key={u.id} className={`hover:bg-neutral-50 ${!u.isActive ? "bg-rose-50/40" : ""}`}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
                         <label className="cursor-pointer group relative" title="Bấm để đổi ảnh đại diện">
@@ -401,16 +679,56 @@ export default function EmployeesPage() {
                         >
                           {u.isTeamLead ? "Phụ trách nhóm" : "Thành viên"}
                         </button>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                            u.isActive ? "bg-emerald-50 text-emerald-700" : "bg-rose-100 text-rose-700"
+                          }`}
+                        >
+                          {u.isActive ? "Đang hoạt động" : "Đã khóa / Chờ duyệt"}
+                        </span>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium">{formatVND(u.baseSalary)}</td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => openAttendanceDetail(u)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-medium cursor-pointer"
-                      >
-                        <Clock className="w-3.5 h-3.5" /> Xem chấm công
-                      </button>
+                      <div className="inline-flex flex-wrap justify-end gap-1.5">
+                        {currentUser?.role === "ADMIN" && (
+                          <>
+                            <button
+                              onClick={() => setPermUserModal(u)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-medium cursor-pointer"
+                              title="Cấp quyền riêng (Xem/Thêm/Sửa/Xóa) cho nhân viên này"
+                            >
+                              <KeyRound className="w-3.5 h-3.5 text-amber-600" /> Cấp quyền
+                            </button>
+                            {u.id !== currentUser.id && (
+                              <button
+                                onClick={() => handleToggleLock(u)}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer ${
+                                  u.isActive
+                                    ? "bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200"
+                                    : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200"
+                                }`}
+                              >
+                                {u.isActive ? (
+                                  <>
+                                    <Lock className="w-3.5 h-3.5" /> Khóa TK
+                                  </>
+                                ) : (
+                                  <>
+                                    <Unlock className="w-3.5 h-3.5" /> Mở khóa
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </>
+                        )}
+                        <button
+                          onClick={() => openAttendanceDetail(u)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-medium cursor-pointer"
+                        >
+                          <Clock className="w-3.5 h-3.5" /> Chấm công
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -499,6 +817,7 @@ export default function EmployeesPage() {
                     <option value="MARKETING">Marketing</option>
                     <option value="ACCOUNTANT">Kế toán</option>
                     <option value="ADMIN">Giám đốc</option>
+                    <option value="LANDLORD">Chủ trọ / Đối tác</option>
                   </select>
                   <select
                     value={form.departmentId}
@@ -678,6 +997,106 @@ export default function EmployeesPage() {
               </div>
             </div>
           </div>
+        )}
+        {/* Modal Cấp quyền riêng theo nhân sự */}
+        {permUserModal && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden my-8 shadow-2xl">
+              <div className="px-6 py-4 bg-neutral-950 text-white flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-amber-400">
+                    Cấp quyền riêng: {permUserModal.fullName} ({permUserModal.employeeCode})
+                  </h3>
+                  <p className="text-xs text-neutral-300">
+                    Vai trò gốc: {ROLE_VI_LABELS[permUserModal.role] || permUserModal.role} • Bật/tắt quyền Xem / Thêm / Sửa / Xóa
+                  </p>
+                </div>
+                <button onClick={() => setPermUserModal(null)} className="text-neutral-400 hover:text-white cursor-pointer">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-5 max-h-[65vh] overflow-y-auto divide-y divide-neutral-100">
+                {PERMISSION_MODULES.map((m) => {
+                  const roleKey = (permUserModal.role as RoleKey) || "SALES";
+                  const cell =
+                    userOverrides[permUserModal.id]?.[m.key] ||
+                    permMatrix[roleKey]?.[m.key] || { view: false, create: false, edit: false, delete: false };
+                  return (
+                    <div key={m.key} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <div className="font-semibold text-sm text-neutral-900">{m.label}</div>
+                        <div className="text-[11px] text-neutral-500">{m.desc}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(
+                          [
+                            { k: "view", label: "Xem", on: "bg-emerald-50 text-emerald-700 border-emerald-300" },
+                            { k: "create", label: "Thêm", on: "bg-amber-50 text-amber-800 border-amber-300" },
+                            { k: "edit", label: "Sửa", on: "bg-sky-50 text-sky-700 border-sky-300" },
+                            { k: "delete", label: "Xóa", on: "bg-rose-50 text-rose-700 border-rose-300" },
+                          ] as const
+                        ).map((btn) => {
+                          const active = cell[btn.k];
+                          return (
+                            <button
+                              key={btn.k}
+                              type="button"
+                              onClick={() => toggleUserOverridePerm(permUserModal.id, roleKey, m.key, btn.k)}
+                              className={`px-2.5 py-1 rounded-md text-xs font-semibold border cursor-pointer ${
+                                active
+                                  ? btn.on
+                                  : "bg-white text-neutral-400 border-neutral-200 hover:bg-neutral-50"
+                              }`}
+                            >
+                              {active ? "✓ " : ""}
+                              {btn.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-200 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserOverrides((prev) => {
+                      const copy = { ...prev };
+                      delete copy[permUserModal.id];
+                      return copy;
+                    });
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-neutral-300 text-xs font-medium text-neutral-700 hover:bg-white cursor-pointer"
+                >
+                  Đặt lại theo vai trò
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPermUserModal(null)}
+                    className="px-4 py-2 rounded-lg border border-neutral-300 text-xs font-medium cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingPerms}
+                    onClick={async () => {
+                      await savePermissions(permUserModal.id);
+                      setPermUserModal(null);
+                    }}
+                    className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-xs font-bold cursor-pointer disabled:opacity-50"
+                  >
+                    {savingPerms ? "Đang lưu..." : "Lưu quyền nhân sự"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+          </>
         )}
       </div>
     </AppShell>

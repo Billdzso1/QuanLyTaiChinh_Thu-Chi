@@ -34,6 +34,21 @@ export async function GET() {
 
   const statsMap = allocateContractRevenue(allActiveContracts, splits);
 
+  if (user.role === "SALES") {
+    const safeContracts = contracts.map((c) => ({
+      ...c,
+      customer: {
+        ...c.customer,
+        email: null,
+        idCard: c.customer.idCard ? `****${c.customer.idCard.slice(-4)}` : null,
+      },
+    }));
+    const safeStats = user.isTeamLead
+      ? statsMap
+      : { [user.id]: statsMap[user.id] || { contractCount: 0, revenue: 0 } };
+    return NextResponse.json({ contracts: safeContracts, salesStats: safeStats });
+  }
+
   return NextResponse.json({ contracts, salesStats: statsMap });
 }
 

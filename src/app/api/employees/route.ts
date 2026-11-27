@@ -96,10 +96,10 @@ export async function PATCH(request: Request) {
 
   await logAudit({
     userId: user.id,
-    action: body.isActive === true ? "APPROVE_USER" : "UPDATE_USER",
+    action: body.isActive === false ? "LOCK_USER" : body.isActive === true ? "APPROVE_USER" : "UPDATE_USER",
     entity: "User",
     entityId: updated.id,
-    details: `${body.isActive === true ? "Duyệt kích hoạt" : "Cập nhật"} nhân sự ${updated.fullName} (Role: ${updated.role})`,
+    details: `${body.isActive === false ? "Khóa tài khoản" : body.isActive === true ? "Kích hoạt/Mở khóa" : "Cập nhật"} nhân sự ${updated.fullName} (Role: ${updated.role})`,
   });
 
   if (body.isActive === true) {

@@ -752,12 +752,14 @@ export default function SalesPage() {
           </div>
         </div>
 
-        {/* Thống kê tổng doanh thu Sales */}
+        {/* Thống kê tổng doanh thu Sales (ẩn doanh thu công ty với nhân viên Sales) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-gradient-to-br from-white to-emerald-50/70 p-5 rounded-xl border border-neutral-200 border-l-4 border-l-emerald-500 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0">
-            <div className="text-xs text-neutral-600 font-medium">Tổng doanh thu công ty (Hoa hồng)</div>
-            <div className="text-xl font-bold text-emerald-700 mt-1 tabular-nums">{formatVND(totalCompanyRevenue)}</div>
-          </div>
+          {currentUserRole !== "SALES" && (
+            <div className="bg-gradient-to-br from-white to-emerald-50/70 p-5 rounded-xl border border-neutral-200 border-l-4 border-l-emerald-500 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0">
+              <div className="text-xs text-neutral-600 font-medium">Tổng doanh thu công ty (Hoa hồng)</div>
+              <div className="text-xl font-bold text-emerald-700 mt-1 tabular-nums">{formatVND(totalCompanyRevenue)}</div>
+            </div>
+          )}
           <div className="bg-gradient-to-br from-white to-amber-50/70 p-5 rounded-xl border border-neutral-200 border-l-4 border-l-amber-500 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0">
             <div className="text-xs text-neutral-600 font-medium">Tổng tiền cọc hợp đồng</div>
             <div className="text-xl font-bold text-amber-700 mt-1 tabular-nums">{formatVND(totalDepositAmount)}</div>
@@ -804,7 +806,9 @@ export default function SalesPage() {
                     <th className="px-4 py-3">Khách hàng & Phòng</th>
                     <th className="px-4 py-3">Sales</th>
                     <th className="px-4 py-3 text-right">Tiền cọc</th>
-                    <th className="px-4 py-3 text-right">Doanh thu CTY</th>
+                    {currentUserRole !== "SALES" && (
+                      <th className="px-4 py-3 text-right">Doanh thu CTY</th>
+                    )}
                     <th className="px-4 py-3 text-right">Trả chủ trọ</th>
                     <th className="px-4 py-3">Thu cọc / Trạng thái</th>
                     <th className="px-4 py-3 text-right">Chi tiết</th>
@@ -844,9 +848,11 @@ export default function SalesPage() {
                         </td>
                         <td className="px-4 py-3 text-xs font-medium text-neutral-700">{c.sales.fullName}</td>
                         <td className="px-4 py-3 text-right font-medium tabular-nums">{formatVND(c.depositAmount)}</td>
-                        <td className="px-4 py-3 text-right font-bold text-emerald-600 tabular-nums">
-                          {formatVND(c.companyRevenue)}
-                        </td>
+                        {currentUserRole !== "SALES" && (
+                          <td className="px-4 py-3 text-right font-bold text-emerald-600 tabular-nums">
+                            {formatVND(c.companyRevenue)}
+                          </td>
+                        )}
                         <td className="px-4 py-3 text-right font-medium text-orange-600 tabular-nums">
                           {formatVND(c.landlordPayable)}
                         </td>
@@ -1702,9 +1708,15 @@ export default function SalesPage() {
                   </div>
                 </div>
                 <div className="p-3 rounded-lg bg-neutral-50 border border-neutral-200 text-xs flex justify-between">
-                  <span>
-                    Doanh thu CTY: <strong className="text-emerald-700">{formatVND(previewCompanyRev)}</strong>
-                  </span>
+                  {currentUserRole !== "SALES" ? (
+                    <span>
+                      Doanh thu CTY: <strong className="text-emerald-700">{formatVND(previewCompanyRev)}</strong>
+                    </span>
+                  ) : (
+                    <span>
+                      Tiền cọc hợp đồng: <strong className="text-emerald-700">{formatVND(Number(form.depositAmount) || 0)}</strong>
+                    </span>
+                  )}
                   <span>
                     Phải trả chủ trọ: <strong className="text-orange-700">{formatVND(previewLandlord)}</strong>
                   </span>
@@ -2233,10 +2245,12 @@ export default function SalesPage() {
                             <span className="text-neutral-500">Sales phụ trách:</span>{" "}
                             <strong className="text-neutral-900">{ct.sales.fullName}</strong>
                           </div>
-                          <div>
-                            <span className="text-neutral-500">Hoa hồng công ty:</span>{" "}
-                            <strong className="text-emerald-700">{formatVND(ct.companyRevenue)}</strong>
-                          </div>
+                          {currentUserRole !== "SALES" && (
+                            <div>
+                              <span className="text-neutral-500">Hoa hồng công ty:</span>{" "}
+                              <strong className="text-emerald-700">{formatVND(ct.companyRevenue)}</strong>
+                            </div>
+                          )}
                           <div>
                             <span className="text-neutral-500">Trả chủ trọ:</span>{" "}
                             <strong className="text-orange-700">{formatVND(ct.landlordPayable)}</strong>
@@ -2910,10 +2924,12 @@ export default function SalesPage() {
                     <span className="text-neutral-500">Tiền đặt cọc:</span>{" "}
                     <strong className="text-amber-700">{formatVND(c.depositAmount)}</strong>
                   </div>
-                  <div>
-                    <span className="text-neutral-500">Hoa hồng công ty ({(c.companyCommissionRate * 100).toFixed(0)}%):</span>{" "}
-                    <strong className="text-emerald-700">{formatVND(c.companyRevenue)}</strong>
-                  </div>
+                  {currentUserRole !== "SALES" && (
+                    <div>
+                      <span className="text-neutral-500">Hoa hồng công ty ({(c.companyCommissionRate * 100).toFixed(0)}%):</span>{" "}
+                      <strong className="text-emerald-700">{formatVND(c.companyRevenue)}</strong>
+                    </div>
+                  )}
                   <div>
                     <span className="text-neutral-500">Tiền trả chủ trọ:</span>{" "}
                     <strong className="text-orange-700">{formatVND(c.landlordPayable)}</strong>
@@ -3384,26 +3400,28 @@ export default function SalesPage() {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-medium mb-1">CCCD / CMND</label>
-                    <input
-                      value={editCustForm.idCard}
-                      onChange={(e) => setEditCustForm({ ...editCustForm, idCard: e.target.value })}
-                      className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
-                      placeholder="Nhập số CCCD"
-                    />
+                {currentUserRole !== "SALES" && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium mb-1">CCCD / CMND</label>
+                      <input
+                        value={editCustForm.idCard}
+                        onChange={(e) => setEditCustForm({ ...editCustForm, idCard: e.target.value })}
+                        className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                        placeholder="Nhập số CCCD"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={editCustForm.email}
+                        onChange={(e) => setEditCustForm({ ...editCustForm, email: e.target.value })}
+                        className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Email</label>
-                    <input
-                      type="email"
-                      value={editCustForm.email}
-                      onChange={(e) => setEditCustForm({ ...editCustForm, email: e.target.value })}
-                      className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
-                </div>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-xs font-medium mb-1">Nguồn khách</label>

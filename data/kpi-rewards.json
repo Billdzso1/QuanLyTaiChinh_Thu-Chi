@@ -1,0 +1,18 @@
+{
+  "2026_11_cmwwxk2lh0003qi9kthjnbku6": {
+    "userId": "cmwwxk2lh0003qi9kthjnbku6",
+    "fullName": "Nguyễn Anh Thư",
+    "monthKey": "2026_11",
+    "mode": "WHEEL",
+    "prize": {
+      "id": "VIP_300K",
+      "label": "Thẻ Quà Tặng VIP 300K",
+      "shortLabel": "VIP +300K",
+      "description": "Thẻ quà tặng trị giá 300.000 đ được cộng vào thưởng tháng này.",
+      "bonusAmount": 300000,
+      "overtimeAmount": 0,
+      "color": "#f97316"
+    },
+    "claimedAt": "2026-11-26T03:01:08.560Z"
+  }
+}

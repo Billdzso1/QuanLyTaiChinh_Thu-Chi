@@ -1,0 +1,19 @@
+[
+  {
+    "id": "cmwxbjvih0001qiks3am490s6_2026-11",
+    "roomId": "cmwxbjvih0001qiks3am490s6",
+    "roomLabel": "Chung Cư Thảo Điền — P101",
+    "monthKey": "2026-11",
+    "roomRent": 8000000,
+    "oldElectric": 50,
+    "newElectric": 100,
+    "electricRate": 3800,
+    "oldWater": 19,
+    "newWater": 28,
+    "waterRate": 20000,
+    "serviceFee": 150000,
+    "totalAmount": 8520000,
+    "isPaid": true,
+    "updatedAt": "2026-11-27T04:50:39.659Z"
+  }
+]

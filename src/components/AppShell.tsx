@@ -467,46 +467,86 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="text-xs font-bold uppercase tracking-wider text-amber-400">Liên kết nhanh</div>
               <ul className="space-y-2 text-xs">
                 <li>
-                  <Link href="/" className="hover:text-amber-400 transition-colors">
+                  <Link
+                    href={user?.role === "LANDLORD" ? "/landlord" : "/"}
+                    className="hover:text-amber-400 transition-colors"
+                  >
                     Trang làm việc chính
                   </Link>
                 </li>
                 <li>
-                  <Link href="/sales" className="hover:text-amber-400 transition-colors">
+                  <Link
+                    href={user?.role === "LANDLORD" ? "/landlord" : "/sales"}
+                    className="hover:text-amber-400 transition-colors"
+                  >
                     Quản lý Nhà / Phòng
                   </Link>
                 </li>
                 <li>
                   <Link href="/profile" className="hover:text-amber-400 transition-colors">
-                    Cài đặt hệ thống
+                    Hồ sơ &amp; Lương cá nhân
                   </Link>
                 </li>
+                {(user?.role === "ADMIN" || user?.role === "ACCOUNTANT") && (
+                  <li>
+                    <Link href="/employees" className="hover:text-amber-400 transition-colors">
+                      Nhân sự &amp; Phân quyền
+                    </Link>
+                  </li>
+                )}
               </ul>
             </div>
 
             {/* Cột 3: Hỗ trợ */}
             <div className="space-y-3">
-              <div className="text-xs font-bold uppercase tracking-wider text-amber-400">Hỗ trợ</div>
+              <div className="text-xs font-bold uppercase tracking-wider text-amber-400">Hỗ trợ &amp; Quy trình</div>
               <ul className="space-y-2 text-xs">
+                {user?.role !== "LANDLORD" && (
+                  <>
+                    <li>
+                      <Link href="/attendance" className="hover:text-amber-400 transition-colors">
+                        Chấm công &amp; Nghỉ phép
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/approvals" className="hover:text-amber-400 transition-colors">
+                        Ngân sách &amp; Phê duyệt
+                      </Link>
+                    </li>
+                  </>
+                )}
+                {user?.role === "LANDLORD" && (
+                  <>
+                    <li>
+                      <Link href="/landlord/utilities" className="hover:text-amber-400 transition-colors">
+                        Điện – Nước &amp; Tiền phòng
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/landlord/operations" className="hover:text-amber-400 transition-colors">
+                        Cư dân, Tạm trú &amp; Vận hành
+                      </Link>
+                    </li>
+                  </>
+                )}
+                {(user?.role === "ADMIN" || user?.role === "IT") && (
+                  <li>
+                    <Link href="/it" className="hover:text-amber-400 transition-colors">
+                      Hỗ trợ kỹ thuật (Phòng IT)
+                    </Link>
+                  </li>
+                )}
+                {user?.role === "ADMIN" && (
+                  <li>
+                    <Link href="/audit" className="hover:text-amber-400 transition-colors">
+                      Nhật ký hệ thống
+                    </Link>
+                  </li>
+                )}
                 <li>
-                  <Link href="/profile" className="hover:text-amber-400 transition-colors">
-                    Câu hỏi thường gặp
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/audit" className="hover:text-amber-400 transition-colors">
-                    Chính sách bảo mật
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/approvals" className="hover:text-amber-400 transition-colors">
-                    Điều khoản sử dụng
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/it" className="hover:text-amber-400 transition-colors">
-                    Liên hệ hỗ trợ
-                  </Link>
+                  <a href="mailto:contact@ndahome.com" className="hover:text-amber-400 transition-colors">
+                    Liên hệ hỗ trợ (Email)
+                  </a>
                 </li>
               </ul>
             </div>

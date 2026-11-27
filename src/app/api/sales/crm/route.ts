@@ -46,12 +46,29 @@ async function saveViewings(items: RoomViewingRecord[]) {
   await writeFile(VIEWINGS_FILE, JSON.stringify(items, null, 2), "utf-8");
 }
 
+function maskPhone(phone?: string | null): string {
+  const s = String(phone || "").trim();
+  if (s.length <= 6) return "***";
+  return `${s.slice(0, 3)}****${s.slice(-3)}`;
+}
+
+function maskIdCard(idCard?: string | null): string | null {
+  const s = String(idCard || "").trim();
+  if (!s) return null;
+  if (s.length <= 4) return "****";
+  return `****${s.slice(-4)}`;
+}
+
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const isSales = user.role === "SALES";
+  const customerWhere = isSales ? { salesId: user.id } : {};
+
   const [customers, properties, rooms, salesUsers, viewings] = await Promise.all([
     prisma.customer.findMany({
+      where: customerWhere,
       include: { sales: { select: { id: true, fullName: true } } },
       orderBy: { createdAt: "desc" },
     }),
@@ -78,6 +95,40 @@ export async function GET() {
     }),
     readViewings(),
   ]);
+
+  if (isSales) {
+    const safeCustomers = customers.map((c) => ({
+      ...c,
+      email: null,
+      idCard: maskIdCard(c.idCard),
+    }));
+    const safeRooms = rooms.map((r) => ({
+      ...r,
+      contracts: r.contracts.map((ct) => {
+        const isMine = ct.salesId === user.id;
+        return {
+          ...ct,
+          companyRevenue: isMine ? ct.companyRevenue : 0,
+          customer: {
+            ...ct.customer,
+            phone: isMine ? ct.customer.phone : maskPhone(ct.customer.phone),
+            email: null,
+            idCard: maskIdCard(ct.customer.idCard),
+          },
+        };
+      }),
+    }));
+    const safeViewings = viewings.filter(
+      (v) => v.salesId === user.id || v.onlineSalesId === user.id
+    );
+    return NextResponse.json({
+      customers: safeCustomers,
+      properties,
+      rooms: safeRooms,
+      salesUsers,
+      viewings: safeViewings,
+    });
+  }
 
   return NextResponse.json({ customers, properties, rooms, salesUsers, viewings });
 }
