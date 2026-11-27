@@ -184,6 +184,7 @@ model Payroll {
   grossIncome     Float    @default(0) // Tổng thu nhập dự kiến
   netSalary       Float    @default(0) // Thực nhận
   status          String   @default("DRAFT") // DRAFT, CHECKED, APPROVED, PAID
+  attachmentUrl   String?  // Ảnh scan / file PDF chứng từ lương hoặc ủy nhiệm chi
   note            String?
   paidAt          DateTime?
   createdAt       DateTime @default(now())
@@ -245,6 +246,7 @@ model Room {
   propertyId String
   property   Property @relation(fields: [propertyId], references: [id])
   roomNumber String
+  roomType   String   @default("PHONG_TRO") // PHONG_TRO, CHUNG_CU, STUDIO, NHA_NGUYEN_CAN
   floor      Int      @default(1)
   area       Float    @default(25)
   price      Float
@@ -424,8 +426,14 @@ model Approval {
   approverId      String?
   approver        User?     @relation("ApprovalApprover", fields: [approverId], references: [id])
   approvedAt      DateTime?
+  approvedAmount  Float?    // Ngân sách Sếp duyệt (VD: đề xuất 10tr, duyệt 8tr)
+  approverNote    String?   // Lý do / ghi chú của Sếp khi duyệt
+  actualSpent     Float     @default(0) // Tổng tiền thực tế đã chi
+  expenseItems    String    @default("[]") // JSON danh sách khoản chi + hóa đơn minh chứng
+  settlementNote  String?   // Ghi chú quyết toán & đóng dự án
+  settledAt       DateTime?
   rejectReason    String?
-  status          String    @default("PENDING") // PENDING, ACCOUNTANT_CHECKED, APPROVED, REJECTED, REVISION_REQUESTED, PAID
+  status          String    @default("PENDING") // PENDING, ACCOUNTANT_CHECKED, APPROVED, PAID, SETTLEMENT_PENDING, CLOSED, REJECTED
   history         String    @default("[]") // JSON lịch sử thay đổi
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -535,4 +543,23 @@ model AuditLog {
   entityId  String?
   details   String?
   createdAt DateTime @default(now())
+}
+
+model JobApplication {
+  id             String   @id @default(cuid())
+  code           String   @unique // UV-2026-001
+  fullName       String
+  phone          String
+  email          String?
+  position       String
+  departmentCode String   @default("SALES")
+  applicantType  String   @default("FULL_TIME") // FULL_TIME, INTERN
+  university     String?
+  expectedSalary Float    @default(0)
+  cvUrl          String?
+  interviewDate  String?
+  status         String   @default("NEW") // NEW, INTERVIEWING, PASSED, REJECTED, ONBOARDED
+  note           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

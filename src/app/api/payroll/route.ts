@@ -1,8 +1,29 @@
 import { NextResponse } from "next/server";
+import { readFile, writeFile, mkdir } from "fs/promises";
+import path from "path";
 import { getCurrentUser, canAccessFinance, UserRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calculateSalesCommission, generateCode } from "@/lib/finance";
+import { readContractSplits, allocateContractRevenue } from "@/lib/contractSplits";
 import { logAudit } from "@/lib/audit";
+
+const PAYROLL_DOCS_FILE = path.join(process.cwd(), "data", "payroll-docs.json");
+
+async function getPayrollDocs(): Promise<Record<string, string>> {
+  try {
+    const raw = await readFile(PAYROLL_DOCS_FILE, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+async function setPayrollDoc(key: string, url: string) {
+  const docs = await getPayrollDocs();
+  docs[key] = url;
+  await mkdir(path.dirname(PAYROLL_DOCS_FILE), { recursive: true });
+  await writeFile(PAYROLL_DOCS_FILE, JSON.stringify(docs, null, 2), "utf-8");
+}
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
@@ -17,14 +38,18 @@ export async function GET(request: Request) {
   const where: Record<string, unknown> = { month, year };
   if (!canViewAll) where.userId = user.id;
 
-  const payrolls = await prisma.payroll.findMany({
-    where,
-    include: {
-      user: { select: { id: true, employeeCode: true, fullName: true, role: true, position: true, department: true } },
-      details: true,
-    },
-    orderBy: { user: { employeeCode: "asc" } },
-  });
+  const docKey = `${year}_${month}`;
+  const [payrolls, docs] = await Promise.all([
+    prisma.payroll.findMany({
+      where,
+      include: {
+        user: { select: { id: true, employeeCode: true, fullName: true, role: true, position: true, department: true } },
+        details: true,
+      },
+      orderBy: { user: { employeeCode: "asc" } },
+    }),
+    getPayrollDocs(),
+  ]);
 
   const history = !canViewAll
     ? await prisma.payroll.findMany({
@@ -33,7 +58,7 @@ export async function GET(request: Request) {
       })
     : [];
 
-  return NextResponse.json({ payrolls, history });
+  return NextResponse.json({ payrolls, history, signedDocUrl: docs[docKey] || null });
 }
 
 export async function POST(request: Request) {
@@ -48,7 +73,7 @@ export async function POST(request: Request) {
   const users = await prisma.user.findMany({ where: { isActive: true } });
   const contracts = await prisma.contract.findMany({
     where: {
-      status: { not: "CANCELLED" },
+      status: { in: ["ACTIVE", "FORFEITED"] },
       signedDate: {
         gte: new Date(`${monthStr}-01T00:00:00Z`),
         lt: new Date(month === 12 ? `${year + 1}-01-01T00:00:00Z` : `${year}-${String(month + 1).padStart(2, "0")}-01T00:00:00Z`),
@@ -56,10 +81,13 @@ export async function POST(request: Request) {
     },
   });
 
+  const splits = await readContractSplits();
+  const salesStats = allocateContractRevenue(contracts, splits);
+
   const results = [];
   for (const u of users) {
     if (u.role === "SALES") {
-      const salesRev = contracts.filter((c) => c.salesId === u.id).reduce((s, c) => s + c.companyRevenue, 0);
+      const salesRev = salesStats[u.id]?.revenue || 0;
       const calc = calculateSalesCommission(salesRev);
       const grossIncome = calc.grossIncome + u.allowance;
       const p = await prisma.payroll.upsert({
@@ -193,6 +221,90 @@ export async function PATCH(request: Request) {
       }
     }
     return NextResponse.json({ ok: true, totalPay });
+  }
+
+  if (body.action === "UPLOAD_PAYROLL_DOC") {
+    const docKey = `${body.year}_${body.month}`;
+    await setPayrollDoc(docKey, body.attachmentUrl || "");
+    await logAudit({
+      userId: user.id,
+      action: "UPLOAD_PAYROLL_DOC",
+      entity: "Payroll",
+      details: `Tải lên/scan bảng lương đã ký T${body.month}/${body.year}`,
+    });
+    return NextResponse.json({ signedDocUrl: body.attachmentUrl || null });
+  }
+
+  if (body.action === "UPLOAD_ROW_ATTACHMENT") {
+    const updated = await prisma.payroll.update({
+      where: { id: body.id },
+      data: { attachmentUrl: body.attachmentUrl || null } as Record<string, unknown>,
+    });
+    await logAudit({
+      userId: user.id,
+      action: "UPLOAD_PAYROLL_ATTACHMENT",
+      entity: "Payroll",
+      entityId: updated.id,
+      details: `Đính kèm chứng từ/scan lương cho ID ${updated.id}`,
+    });
+    return NextResponse.json({ payroll: updated });
+  }
+
+  if (body.action === "BATCH_SCAN_UPDATE") {
+    const docKey = `${body.year}_${body.month}`;
+    if (body.attachmentUrl) {
+      await setPayrollDoc(docKey, body.attachmentUrl);
+    }
+
+    const items = Array.isArray(body.items) ? body.items : [];
+    let updatedCount = 0;
+
+    if (items.length > 0) {
+      const monthPayrolls = await prisma.payroll.findMany({
+        where: { month: body.month, year: body.year },
+        include: { user: { select: { employeeCode: true, fullName: true } } },
+      });
+
+      const norm = (s: string) =>
+        s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+      for (const item of items) {
+        const match = monthPayrolls.find((p) => {
+          if (item.employeeCode && norm(p.user.employeeCode) === norm(String(item.employeeCode))) return true;
+          if (item.fullName && norm(p.user.fullName) === norm(String(item.fullName))) return true;
+          return false;
+        });
+        if (!match) continue;
+
+        const bonus = item.bonus !== undefined ? Number(item.bonus) : match.bonus;
+        const overtimePay = item.overtimePay !== undefined ? Number(item.overtimePay) : match.overtimePay;
+        const deduction = item.deduction !== undefined ? Number(item.deduction) : match.deduction;
+        const grossIncome = match.baseSalary + match.commissionAmount + match.allowance + bonus + overtimePay;
+        const netSalary = Math.max(0, grossIncome - deduction);
+
+        await prisma.payroll.update({
+          where: { id: match.id },
+          data: {
+            bonus,
+            overtimePay,
+            deduction,
+            grossIncome,
+            netSalary,
+            note: item.note || match.note,
+          },
+        });
+        updatedCount++;
+      }
+    }
+
+    await logAudit({
+      userId: user.id,
+      action: "SCAN_UPDATE_PAYROLL",
+      entity: "Payroll",
+      details: `Quét & cập nhật tự động ${updatedCount} bảng lương T${body.month}/${body.year}`,
+    });
+
+    return NextResponse.json({ updatedCount, signedDocUrl: body.attachmentUrl || null });
   }
 
   return NextResponse.json({ error: "Invalid action" }, { status: 400 });

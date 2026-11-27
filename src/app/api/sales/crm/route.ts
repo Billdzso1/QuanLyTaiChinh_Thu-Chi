@@ -1,12 +1,56 @@
 import { NextResponse } from "next/server";
+import { readFile, writeFile, mkdir } from "fs/promises";
+import path from "path";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+
+interface RoomViewingRecord {
+  id: string;
+  code: string;
+  roomId: string;
+  roomLabel: string;
+  propertyName?: string;
+  roomNumber?: string;
+  roomImage?: string | null;
+  address?: string;
+  district: string;
+  price: number;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  salesId: string;
+  salesName: string;
+  onlineSalesId?: string;
+  onlineSalesName?: string;
+  hybridMode?: string;
+  reminderMinutes?: number;
+  viewingAt: string;
+  note?: string;
+  status: "SCHEDULED" | "VIEWED" | "CONTRACTED" | "CANCELLED";
+  createdAt: string;
+}
+
+const VIEWINGS_FILE = path.join(process.cwd(), "data", "room-viewings.json");
+
+async function readViewings(): Promise<RoomViewingRecord[]> {
+  try {
+    const raw = await readFile(VIEWINGS_FILE, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+async function saveViewings(items: RoomViewingRecord[]) {
+  await mkdir(path.dirname(VIEWINGS_FILE), { recursive: true });
+  await writeFile(VIEWINGS_FILE, JSON.stringify(items, null, 2), "utf-8");
+}
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const [customers, properties, rooms, salesUsers] = await Promise.all([
+  const [customers, properties, rooms, salesUsers, viewings] = await Promise.all([
     prisma.customer.findMany({
       include: { sales: { select: { id: true, fullName: true } } },
       orderBy: { createdAt: "desc" },
@@ -32,9 +76,10 @@ export async function GET() {
       where: { role: "SALES", isActive: true },
       select: { id: true, fullName: true, employeeCode: true, kpiTarget: true },
     }),
+    readViewings(),
   ]);
 
-  return NextResponse.json({ customers, properties, rooms, salesUsers });
+  return NextResponse.json({ customers, properties, rooms, salesUsers, viewings });
 }
 
 export async function POST(request: Request) {
@@ -73,19 +118,136 @@ export async function POST(request: Request) {
   }
 
   if (body.entity === "ROOM") {
+    let targetPropertyId = body.propertyId;
+    const requestedDistrict = String(body.district || "").trim();
+
+    if (!targetPropertyId || targetPropertyId === "__NEW__") {
+      const dist = requestedDistrict || "Bình Thạnh";
+      const createdProp = await prisma.property.create({
+        data: {
+          name: String(body.propertyName || "").trim() || `NDAHome ${dist}`,
+          address: String(body.address || "").trim() || dist,
+          district: dist,
+          landlordName: String(body.landlordName || "").trim() || "Chủ nhà",
+          landlordPhone: String(body.landlordPhone || "").trim() || "",
+        },
+      });
+      targetPropertyId = createdProp.id;
+    } else if (requestedDistrict) {
+      const existingProp = await prisma.property.findUnique({ where: { id: targetPropertyId } });
+      if (existingProp && existingProp.district !== requestedDistrict) {
+        const createdProp = await prisma.property.create({
+          data: {
+            name: String(body.propertyName || "").trim() || `${existingProp.name} (${requestedDistrict})`,
+            address: String(body.address || "").trim() || existingProp.address || requestedDistrict,
+            district: requestedDistrict,
+            landlordName: existingProp.landlordName,
+            landlordPhone: existingProp.landlordPhone,
+          },
+        });
+        targetPropertyId = createdProp.id;
+      }
+    }
+
     const room = await prisma.room.create({
       data: {
-        propertyId: body.propertyId,
+        propertyId: targetPropertyId,
         roomNumber: body.roomNumber,
+        roomType: body.roomType || "PHONG_TRO",
         floor: Number(body.floor) || 1,
         area: Number(body.area) || 25,
         price: Number(body.price),
         status: "AVAILABLE",
         amenities: body.amenities || null,
         imageUrl: body.imageUrl || null,
-      },
+      } as Record<string, unknown> as never,
     });
     return NextResponse.json({ room }, { status: 201 });
+  }
+
+  if (body.entity === "VIEWING") {
+    const room = await prisma.room.findUnique({
+      where: { id: body.roomId },
+      include: { property: true },
+    });
+    if (!room) {
+      return NextResponse.json({ error: "Không tìm thấy phòng" }, { status: 404 });
+    }
+
+    const salesId = body.salesId || user.id;
+    const salesUser = await prisma.user.findUnique({
+      where: { id: salesId },
+      select: { id: true, fullName: true },
+    });
+
+    let customerId = body.customerId;
+    let customerName = String(body.customerName || "").trim();
+    let customerPhone = String(body.customerPhone || "").trim();
+
+    if (!customerId || customerId === "__NEW__") {
+      if (!customerName || !customerPhone) {
+        return NextResponse.json({ error: "Vui lòng nhập tên và SĐT khách hàng" }, { status: 400 });
+      }
+      const createdCust = await prisma.customer.create({
+        data: {
+          fullName: customerName,
+          phone: customerPhone,
+          source: body.source || "WALK_IN",
+          status: "VIEWING",
+          salesId,
+          note: `Đặt lịch xem phòng ${room.property.name} - ${room.roomNumber}`,
+        },
+      });
+      customerId = createdCust.id;
+    } else {
+      const existingCust = await prisma.customer.findUnique({ where: { id: customerId } });
+      if (existingCust) {
+        customerName = existingCust.fullName;
+        customerPhone = existingCust.phone;
+        if (existingCust.status === "POTENTIAL") {
+          await prisma.customer.update({
+            where: { id: existingCust.id },
+            data: { status: "VIEWING" },
+          });
+        }
+      }
+    }
+
+    const viewings = await readViewings();
+    const now = new Date();
+    const code = `LH-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}-${String(viewings.length + 1).padStart(2, "0")}`;
+    const newViewing: RoomViewingRecord = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      code,
+      roomId: room.id,
+      roomLabel: `${room.property.name} — ${room.roomNumber}`,
+      propertyName: room.property.name,
+      roomNumber: room.roomNumber,
+      roomImage: room.imageUrl || null,
+      address: room.property.address || "",
+      district: room.property.district,
+      price: room.price,
+      customerId,
+      customerName,
+      customerPhone,
+      salesId,
+      salesName:
+        body.hybridMode === "POOL_50_50" || body.hybridMode === "POOL_40_60"
+          ? "Kho lịch chờ nhận (50% / 50%)"
+          : salesUser?.fullName || user.fullName,
+      onlineSalesId: user.id,
+      onlineSalesName: user.fullName,
+      hybridMode: body.hybridMode || "SELF_100",
+      reminderMinutes: Number(body.reminderMinutes) || 30,
+      viewingAt: body.viewingAt || now.toISOString(),
+      note: body.note || "",
+      status: "SCHEDULED",
+      createdAt: now.toISOString(),
+    };
+
+    viewings.unshift(newViewing);
+    await saveViewings(viewings);
+    return NextResponse.json({ viewing: newViewing }, { status: 201 });
   }
 
   return NextResponse.json({ error: "Invalid entity" }, { status: 400 });
@@ -101,13 +263,14 @@ export async function PATCH(request: Request) {
       where: { id: body.id },
       data: {
         roomNumber: body.roomNumber !== undefined ? body.roomNumber : undefined,
+        roomType: body.roomType !== undefined ? body.roomType : undefined,
         floor: body.floor !== undefined ? Number(body.floor) : undefined,
         area: body.area !== undefined ? Number(body.area) : undefined,
         amenities: body.amenities !== undefined ? body.amenities : undefined,
         imageUrl: body.imageUrl !== undefined ? body.imageUrl : undefined,
         status: body.status !== undefined ? body.status : undefined,
         price: body.price !== undefined ? Number(body.price) : undefined,
-      },
+      } as Record<string, unknown>,
     });
     if (body.status === "AVAILABLE") {
       await prisma.contract.updateMany({
@@ -134,6 +297,29 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ customer });
   }
 
+  if (body.entity === "VIEWING") {
+    const viewings = await readViewings();
+    const idx = viewings.findIndex((v) => v.id === body.id);
+    if (idx === -1) return NextResponse.json({ error: "Không tìm thấy lịch hẹn" }, { status: 404 });
+    viewings[idx] = { ...viewings[idx], status: body.status || viewings[idx].status };
+    await saveViewings(viewings);
+    return NextResponse.json({ viewing: viewings[idx] });
+  }
+
+  if (body.entity === "PROPERTY") {
+    const property = await prisma.property.update({
+      where: { id: body.id },
+      data: {
+        name: body.name !== undefined ? body.name : undefined,
+        district: body.district !== undefined ? body.district : undefined,
+        address: body.address !== undefined ? body.address : undefined,
+        landlordName: body.landlordName !== undefined ? body.landlordName : undefined,
+        landlordPhone: body.landlordPhone !== undefined ? body.landlordPhone : undefined,
+      },
+    });
+    return NextResponse.json({ property });
+  }
+
   return NextResponse.json({ error: "Invalid entity" }, { status: 400 });
 }
 
@@ -145,6 +331,18 @@ export async function DELETE(request: Request) {
   const entity = searchParams.get("entity");
   const id = searchParams.get("id");
   if (!entity || !id) return NextResponse.json({ error: "Missing params" }, { status: 400 });
+
+  if (entity === "PROPERTY") {
+    const roomCount = await prisma.room.count({ where: { propertyId: id } });
+    if (roomCount > 0) {
+      return NextResponse.json(
+        { error: `Khu vực này đang có ${roomCount} phòng. Vui lòng xóa hết phòng trong khu vực này trước khi xóa khu vực.` },
+        { status: 400 }
+      );
+    }
+    await prisma.property.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  }
 
   if (entity === "ROOM") {
     const count = await prisma.contract.count({ where: { roomId: id } });

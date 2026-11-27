@@ -4,7 +4,9 @@ import React, { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { formatVND, formatDate } from "@/lib/finance";
 import { exportToExcel } from "@/lib/export";
-import { Plus, Download, CheckCircle2, Search, Upload, Image as ImageIcon, X } from "lucide-react";
+import { AttachmentPreviewModal, isImageUrl } from "@/components/AttachmentPreviewModal";
+import { extractTextFromFile, parseFinanceItems } from "@/lib/smartScan";
+import { Plus, Download, CheckCircle2, Search, Upload, Camera, FileText, Eye } from "lucide-react";
 
 interface Transaction {
   id: string;
@@ -30,9 +32,12 @@ export default function FinancePage() {
   const [filterType, setFilterType] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [monthFilter, setMonthFilter] = useState("ALL");
+  const [deptFilter, setDeptFilter] = useState("ALL");
   const [showModal, setShowModal] = useState(false);
   const [previewVoucher, setPreviewVoucher] = useState<string | null>(null);
   const [uploadingVoucher, setUploadingVoucher] = useState(false);
+  const [scanningSmart, setScanningSmart] = useState(false);
+  const [scanMsg, setScanMsg] = useState("");
 
   const [form, setForm] = useState({
     type: "EXPENSE",
@@ -81,6 +86,84 @@ export default function FinancePage() {
       setForm((f) => ({ ...f, voucherUrl: d.url }));
     }
     setUploadingVoucher(false);
+    e.target.value = "";
+  }
+
+  async function handleSmartScanFinance(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setScanningSmart(true);
+    setScanMsg("Đang tải tệp & quét thông tin tự động...");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const [uploadRes, extracted] = await Promise.all([
+        fetch("/api/upload", { method: "POST", body: fd }),
+        extractTextFromFile(file, (_pct, status) => setScanMsg(status)),
+      ]);
+      const voucherUrl = uploadRes.ok ? (await uploadRes.json()).url : "";
+      const parsedItems = parseFinanceItems(
+        extracted.text,
+        extracted.excelRows,
+        categories,
+        departments,
+        file.name
+      );
+
+      const validItems = parsedItems.filter((item) => item.amount > 0);
+      if (validItems.length > 0) {
+        let createdCount = 0;
+        for (const item of validItems) {
+          const res = await fetch("/api/finance/transactions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...item, voucherUrl }),
+          });
+          if (res.ok) createdCount++;
+        }
+        try {
+          localStorage.setItem(
+            "ndahome_finance_last_scan",
+            JSON.stringify({
+              fileName: file.name,
+              voucherUrl,
+              createdCount,
+              items: validItems,
+              scannedAt: new Date().toISOString(),
+            })
+          );
+        } catch {
+          // ignore localStorage quota errors
+        }
+        await loadData();
+        setShowModal(false);
+        const first = validItems[0];
+        setScanMsg(
+          createdCount === 1
+            ? `Đã quét "${file.name}" và tự động lưu ${first.type === "INCOME" ? "Khoản Thu" : "Khoản Chi"} "${first.title}" (${formatVND(first.amount)}) vào database & local!`
+            : `Đã quét "${file.name}" và tự động lưu ${createdCount} khoản Thu/Chi vào database & local!`
+        );
+      } else {
+        // Fallback: pre-fill modal so user just enters amount
+        const first = parsedItems[0];
+        setForm((f) => ({
+          ...f,
+          type: first?.type || "EXPENSE",
+          title: first?.title || file.name,
+          categoryId: first?.categoryId || f.categoryId,
+          departmentId: first?.departmentId || f.departmentId,
+          paymentStatus: first?.paymentStatus || "PAID",
+          isDebt: first?.isDebt || false,
+          reason: first?.reason || "",
+          voucherUrl,
+        }));
+        setShowModal(true);
+        setScanMsg(`Đã tải "${file.name}" & điền sẵn thông tin — vui lòng kiểm tra lại số tiền và bấm Lưu.`);
+      }
+    } finally {
+      setScanningSmart(false);
+      e.target.value = "";
+    }
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -106,10 +189,8 @@ export default function FinancePage() {
     loadData();
   }
 
-  const filtered = transactions.filter((t) => {
-    if (filterType === "INCOME" && t.type !== "INCOME") return false;
-    if (filterType === "EXPENSE" && t.type !== "EXPENSE") return false;
-    if (filterType === "DEBT" && t.paymentStatus !== "UNPAID" && !t.isDebt) return false;
+  const baseFiltered = transactions.filter((t) => {
+    if (deptFilter !== "ALL" && t.department.id !== deptFilter) return false;
     if (monthFilter !== "ALL" && !t.transactionDate.startsWith(monthFilter)) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -122,9 +203,16 @@ export default function FinancePage() {
     return true;
   });
 
-  const totalIncome = transactions.filter((t) => t.type === "INCOME").reduce((s, t) => s + t.amount, 0);
-  const totalExpense = transactions.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + t.amount, 0);
-  const totalUnpaidDebt = transactions
+  const filtered = baseFiltered.filter((t) => {
+    if (filterType === "INCOME" && t.type !== "INCOME") return false;
+    if (filterType === "EXPENSE" && t.type !== "EXPENSE") return false;
+    if (filterType === "DEBT" && t.paymentStatus !== "UNPAID" && !t.isDebt) return false;
+    return true;
+  });
+
+  const totalIncome = baseFiltered.filter((t) => t.type === "INCOME").reduce((s, t) => s + t.amount, 0);
+  const totalExpense = baseFiltered.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + t.amount, 0);
+  const totalUnpaidDebt = baseFiltered
     .filter((t) => t.type === "EXPENSE" && t.paymentStatus === "UNPAID")
     .reduce((s, t) => s + t.amount, 0);
 
@@ -168,6 +256,12 @@ export default function FinancePage() {
           </div>
         </div>
 
+        {scanMsg && (
+          <div className="p-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-sm">
+            {scanMsg}
+          </div>
+        )}
+
         {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-gradient-to-br from-white to-emerald-50/70 p-5 rounded-xl border border-neutral-200 border-l-4 border-l-emerald-500 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0">
@@ -205,16 +299,28 @@ export default function FinancePage() {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <Search className="w-4 h-4 text-neutral-400 absolute left-2.5 top-2" />
               <input
                 placeholder="Tìm mã, nội dung..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 pr-3 py-1.5 border border-neutral-300 rounded-lg text-xs bg-white w-48"
+                className="pl-8 pr-3 py-1.5 border border-neutral-300 rounded-lg text-xs bg-white w-44"
               />
             </div>
+            <select
+              value={deptFilter}
+              onChange={(e) => setDeptFilter(e.target.value)}
+              className="border border-neutral-300 rounded-lg px-2.5 py-1.5 text-xs bg-white"
+            >
+              <option value="ALL">Tất cả phòng ban</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
             <select
               value={monthFilter}
               onChange={(e) => setMonthFilter(e.target.value)}
@@ -274,23 +380,26 @@ export default function FinancePage() {
                         {tx.paymentStatus === "PAID" ? "Đã thanh toán" : "Chưa thanh toán"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right space-x-1">
-                      {tx.voucherUrl && (
-                        <button
-                          onClick={() => setPreviewVoucher(tx.voucherUrl || null)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-medium cursor-pointer"
-                        >
-                          <ImageIcon className="w-3.5 h-3.5" /> Chứng từ
-                        </button>
-                      )}
-                      {tx.paymentStatus === "UNPAID" && (
-                        <button
-                          onClick={() => markPaid(tx.id)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Thanh toán
-                        </button>
-                      )}
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex flex-wrap items-center justify-end gap-1">
+                        {tx.voucherUrl && (
+                          <button
+                            onClick={() => setPreviewVoucher(tx.voucherUrl || null)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-medium cursor-pointer"
+                            title="Xem chứng từ / tệp đính kèm"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> Chứng từ
+                          </button>
+                        )}
+                        {tx.paymentStatus === "UNPAID" && (
+                          <button
+                            onClick={() => markPaid(tx.id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Thanh toán
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -382,15 +491,52 @@ export default function FinancePage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-neutral-700 mb-1">Hóa đơn / Chứng từ (tùy chọn)</label>
-                  <div className="flex items-center gap-3">
-                    <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-950 text-amber-400 text-xs font-medium cursor-pointer">
+                  <label className="block text-xs font-medium text-neutral-700 mb-1">
+                    Hóa đơn / Chứng từ (Tự động quét &amp; thêm vào hệ thống)
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-xs font-medium cursor-pointer">
+                      <Camera className="w-3.5 h-3.5" />
+                      {scanningSmart || uploadingVoucher ? "Đang quét..." : "Scan / Chụp ảnh"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleSmartScanFinance}
+                        disabled={scanningSmart || uploadingVoucher}
+                        className="hidden"
+                      />
+                    </label>
+                    <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-neutral-300 hover:bg-neutral-50 text-neutral-700 text-xs font-medium cursor-pointer">
                       <Upload className="w-3.5 h-3.5" />
-                      {uploadingVoucher ? "Đang tải..." : "Tải ảnh chứng từ"}
-                      <input type="file" accept="image/*" onChange={handleVoucherUpload} className="hidden" />
+                      {scanningSmart || uploadingVoucher ? "Đang quét..." : "Tải tệp (Ảnh / Excel / PDF)"}
+                      <input
+                        type="file"
+                        accept="image/*,.xlsx,.xls,.csv,.pdf,.doc,.docx,.txt"
+                        onChange={handleSmartScanFinance}
+                        disabled={scanningSmart || uploadingVoucher}
+                        className="hidden"
+                      />
                     </label>
                     {form.voucherUrl && (
-                      <img src={form.voucherUrl} alt="Chứng từ" className="w-10 h-10 rounded object-cover border border-amber-400" />
+                      <div className="inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-amber-50 border border-amber-300 text-xs text-amber-900">
+                        {isImageUrl(form.voucherUrl) ? (
+                          <img
+                            src={form.voucherUrl}
+                            alt="Chứng từ"
+                            className="w-8 h-8 rounded object-cover border border-amber-400"
+                          />
+                        ) : (
+                          <FileText className="w-4 h-4 text-amber-700" />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setPreviewVoucher(form.voucherUrl)}
+                          className="underline font-medium cursor-pointer"
+                        >
+                          Xem tệp
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -414,19 +560,11 @@ export default function FinancePage() {
           </div>
         )}
 
-        {previewVoucher && (
-          <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setPreviewVoucher(null)}>
-            <div className="bg-white rounded-2xl max-w-lg w-full p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between">
-                <div className="font-bold text-sm text-neutral-900">Ảnh hóa đơn / chứng từ</div>
-                <button onClick={() => setPreviewVoucher(null)} className="p-1 rounded-lg hover:bg-neutral-100 cursor-pointer">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <img src={previewVoucher} alt="Chứng từ" className="w-full max-h-[70vh] object-contain rounded-lg border border-neutral-200" />
-            </div>
-          </div>
-        )}
+        <AttachmentPreviewModal
+          url={previewVoucher}
+          title="Chứng từ Thu / Chi & Công nợ"
+          onClose={() => setPreviewVoucher(null)}
+        />
       </div>
     </AppShell>
   );

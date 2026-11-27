@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, Mail } from "lucide-react";
 import { CompanyLogo } from "@/components/CompanyLogo";
+import { HumanVerifyWidget } from "@/components/HumanVerifyWidget";
 
 const DEMO_ACCOUNTS = [
   { label: "Giám đốc (Admin)", email: "giamdoc@ndahome.vn" },
@@ -11,30 +13,39 @@ const DEMO_ACCOUNTS = [
   { label: "Sales (Phụ trách nhóm)", email: "sales1@ndahome.vn" },
   { label: "IT (Phụ trách nhóm)", email: "it1@ndahome.vn" },
   { label: "Marketing (Phụ trách nhóm)", email: "mkt1@ndahome.vn" },
+  { label: "Chủ trọ / Đối tác", email: "chutro@ndahome.vn" },
 ];
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("giamdoc@ndahome.vn");
   const [password, setPassword] = useState("123456");
+  const [humanToken, setHumanToken] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (!humanToken) {
+      setError("Vui lòng xác nhận 'Tôi không phải là người máy' trước khi đăng nhập.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, humanToken }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "Đăng nhập thất bại");
       } else {
-        router.push("/");
+        if (data.token) {
+          sessionStorage.setItem("ndahome_tab_token", data.token);
+        }
+        router.push(data.user?.role === "LANDLORD" ? "/landlord" : "/");
         router.refresh();
       }
     } catch {
@@ -45,8 +56,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-950 p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border-2 border-amber-500 p-8">
+    <div className="relative min-h-screen flex items-center justify-center bg-[#09090b] p-4 overflow-hidden">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-30"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 50% 15%, rgba(251,191,36,0.35), transparent 50%), radial-gradient(circle at 80% 85%, rgba(16,185,129,0.18), transparent 45%), linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px)",
+          backgroundSize: "100% 100%, 100% 100%, 38px 38px, 38px 38px",
+        }}
+      />
+      <div className="relative z-10 w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_25px_70px_-15px_rgba(251,191,36,0.3)] border-2 border-amber-400/80 p-8 nda-page-enter">
         <div className="flex items-center gap-3 mb-6">
           <CompanyLogo size={44} />
           <div>
@@ -84,7 +103,14 @@ export default function LoginPage() {
                 placeholder="••••••"
               />
             </div>
+            <div className="flex justify-end mt-1.5">
+              <Link href="/forgot-password" className="text-xs font-semibold text-amber-700 hover:underline">
+                Quên mật khẩu?
+              </Link>
+            </div>
           </div>
+
+          <HumanVerifyWidget verifiedToken={humanToken} onVerified={setHumanToken} />
 
           {error && (
             <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
@@ -99,6 +125,13 @@ export default function LoginPage() {
           >
             {loading ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>
+
+          <div className="text-center text-xs text-neutral-600 pt-1">
+            Nhân sự mới chưa có tài khoản?{" "}
+            <Link href="/register" className="font-bold text-amber-700 hover:underline">
+              Đăng ký tài khoản
+            </Link>
+          </div>
         </form>
 
         <div className="mt-6 pt-5 border-t border-neutral-200">

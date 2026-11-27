@@ -11,6 +11,11 @@ const MIME_MAP: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
   ".gif": "image/gif",
+  ".pdf": "application/pdf",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xls": "application/vnd.ms-excel",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 };
 
 export async function GET(request: Request) {
@@ -41,7 +46,7 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
   if (!file) {
-    return NextResponse.json({ error: "Vui lòng chọn tệp hình ảnh" }, { status: 400 });
+    return NextResponse.json({ error: "Vui lòng chọn tệp hoặc hình ảnh" }, { status: 400 });
   }
 
   const ext = path.extname(file.name).toLowerCase() || ".png";
@@ -49,5 +54,5 @@ export async function POST(request: Request) {
   const bytes = await file.arrayBuffer();
   await writeFile(path.join(UPLOAD_DIR, fileName), Buffer.from(bytes));
 
-  return NextResponse.json({ url: `/api/upload?file=${fileName}` });
+  return NextResponse.json({ url: `/api/upload?file=${fileName}`, originalName: file.name });
 }

@@ -5,7 +5,10 @@ import { AppShell } from "@/components/AppShell";
 import { formatVND } from "@/lib/finance";
 import { getStatusLabel } from "@/lib/labels";
 import { exportToExcel } from "@/lib/export";
-import { Calculator, Check, ShieldCheck, Wallet, Download, Pencil } from "lucide-react";
+import { buildPayrollPrintHtml, printPayrollHardcopy } from "@/lib/payrollPrint";
+import { AttachmentPreviewModal } from "@/components/AttachmentPreviewModal";
+import { extractTextFromFile, parsePayrollItems } from "@/lib/smartScan";
+import { Calculator, Check, ShieldCheck, Wallet, Download, Pencil, Printer, X, Camera, Upload, Eye, FileCheck2 } from "lucide-react";
 
 interface PayrollRow {
   id: string;
@@ -23,6 +26,7 @@ interface PayrollRow {
   grossIncome: number;
   netSalary: number;
   status: string;
+  attachmentUrl?: string | null;
   user: {
     employeeCode: string;
     fullName: string;
@@ -39,12 +43,20 @@ export default function PayrollPage() {
   const [msg, setMsg] = useState("");
   const [editRow, setEditRow] = useState<PayrollRow | null>(null);
   const [adjForm, setAdjForm] = useState({ bonus: "0", overtimePay: "0", deduction: "0", note: "" });
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [preparedBy, setPreparedBy] = useState("");
+  const [directorName, setDirectorName] = useState("Nguyễn Đức Anh");
+  const [signedDocUrl, setSignedDocUrl] = useState<string | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [scanStatus, setScanStatus] = useState("");
+  const [previewAttachment, setPreviewAttachment] = useState<{ url: string; title: string } | null>(null);
 
   async function loadData(m = month) {
     const res = await fetch(`/api/payroll?scope=all&month=${m}&year=${year}`);
     if (res.ok) {
       const d = await res.json();
       setPayrolls(d.payrolls);
+      setSignedDocUrl(d.signedDocUrl || null);
     }
   }
 
@@ -77,6 +89,74 @@ export default function PayrollPage() {
     } else {
       setMsg("Đã cập nhật trạng thái bảng lương!");
       loadData();
+    }
+  }
+
+  async function uploadFileToServer(file: File): Promise<string | null> {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    if (!res.ok) return null;
+    const d = await res.json();
+    return d.url || null;
+  }
+
+  async function handleUploadPayrollDoc(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingDoc(true);
+    setScanStatus("Đang tải tệp & quét dữ liệu tự động...");
+    try {
+      const [url, extracted] = await Promise.all([
+        uploadFileToServer(file),
+        extractTextFromFile(file, (_pct, status) => setScanStatus(status)),
+      ]);
+      const scannedItems = parsePayrollItems(
+        extracted.text,
+        extracted.excelRows,
+        payrolls.map((p) => ({ employeeCode: p.user.employeeCode, fullName: p.user.fullName }))
+      );
+
+      const res = await fetch("/api/payroll", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "BATCH_SCAN_UPDATE",
+          month,
+          year,
+          attachmentUrl: url || signedDocUrl || "",
+          items: scannedItems,
+        }),
+      });
+
+      if (res.ok) {
+        const d = await res.json();
+        if (url) setSignedDocUrl(url);
+        try {
+          localStorage.setItem(
+            `ndahome_payroll_scan_${year}_${month}`,
+            JSON.stringify({
+              fileName: file.name,
+              url,
+              updatedCount: d.updatedCount || 0,
+              scannedAt: new Date().toISOString(),
+              items: scannedItems,
+            })
+          );
+        } catch {
+          // ignore localStorage quota errors
+        }
+        await loadData();
+        setMsg(
+          d.updatedCount > 0
+            ? `Đã quét "${file.name}" và tự động cập nhật ${d.updatedCount} nhân sự vào database & lưu cục bộ!`
+            : `Đã lưu bản scan/tệp "${file.name}" cho bảng lương tháng ${month}/${year} vào database & lưu cục bộ!`
+        );
+      }
+    } finally {
+      setUploadingDoc(false);
+      setScanStatus("");
+      e.target.value = "";
     }
   }
 
@@ -173,6 +253,13 @@ export default function PayrollPage() {
             >
               <Download className="w-4 h-4" /> Excel
             </button>
+            <button
+              onClick={() => setShowPrintPreview(true)}
+              disabled={payrolls.length === 0}
+              className="px-3.5 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 disabled:opacity-50 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <Printer className="w-4 h-4" /> Xuất bảng cứng / PDF
+            </button>
           </div>
         </div>
 
@@ -182,7 +269,7 @@ export default function PayrollPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-gradient-to-br from-white to-amber-50/70 p-5 rounded-xl border border-neutral-200 border-l-4 border-l-amber-500 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0">
-            <div className="text-xs text-neutral-600">Tổng quỹ lương thực nhận (16 NV)</div>
+            <div className="text-xs text-neutral-600">Tổng quỹ lương thực nhận ({payrolls.length} NV)</div>
             <div className="text-xl font-bold text-neutral-950 mt-1 tabular-nums">{formatVND(totalNet)}</div>
           </div>
           <div className="bg-gradient-to-br from-white to-emerald-50/70 p-5 rounded-xl border border-neutral-200 border-l-4 border-l-emerald-500 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0">
@@ -192,6 +279,61 @@ export default function PayrollPage() {
           <div className="bg-gradient-to-br from-white to-sky-50/70 p-5 rounded-xl border border-neutral-200 border-l-4 border-l-sky-500 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0">
             <div className="text-xs text-neutral-600">Số bảng lương đã lập</div>
             <div className="text-xl font-bold text-sky-700 mt-1">{payrolls.length} nhân sự</div>
+          </div>
+        </div>
+
+        {/* Scan / Tải tệp Bảng lương đã ký & đóng mộc của tháng */}
+        <div className="bg-white rounded-xl border border-neutral-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <FileCheck2 className={`w-5 h-5 ${signedDocUrl ? "text-emerald-600" : "text-amber-600"}`} />
+            <div>
+              <div className="text-sm font-semibold text-neutral-900">
+                Quét tự động &amp; Lưu trữ Bảng lương (Tháng {month}/{year})
+              </div>
+              <div className="text-xs text-neutral-500">
+                {scanStatus
+                  ? scanStatus
+                  : signedDocUrl
+                    ? "Đã lưu bản scan / tệp bảng lương. Bấm Scan hoặc Tải tệp (Excel/Ảnh/PDF) để tự động quét & cập nhật dữ liệu."
+                    : "Bấm Scan hình ảnh hoặc Tải tệp để hệ thống tự động quét thông tin, cập nhật database & lưu cục bộ."}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {signedDocUrl && (
+              <button
+                onClick={() =>
+                  setPreviewAttachment({
+                    url: signedDocUrl,
+                    title: `Bảng lương đã ký & đóng mộc — Tháng ${month}/${year}`,
+                  })
+                }
+                className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Eye className="w-3.5 h-3.5" /> Xem bản đã lưu
+              </button>
+            )}
+            <label className="px-3 py-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer">
+              <Camera className="w-3.5 h-3.5" />
+              {uploadingDoc ? "Đang tải..." : "Scan ảnh (Camera)"}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleUploadPayrollDoc}
+                className="hidden"
+              />
+            </label>
+            <label className="px-3 py-1.5 rounded-lg bg-white hover:bg-neutral-50 border border-neutral-300 text-neutral-700 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer">
+              <Upload className="w-3.5 h-3.5" />
+              {uploadingDoc ? "Đang tải..." : "Tải tệp (Ảnh / PDF)"}
+              <input
+                type="file"
+                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                onChange={handleUploadPayrollDoc}
+                className="hidden"
+              />
+            </label>
           </div>
         </div>
 
@@ -343,6 +485,80 @@ export default function PayrollPage() {
             </div>
           </div>
         )}
+
+        {showPrintPreview && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-neutral-200 bg-neutral-50">
+                <div>
+                  <h3 className="text-base font-bold text-neutral-900">
+                    Xem trước Bảng lương cứng — Tháng {month}/{year}
+                  </h3>
+                  <p className="text-xs text-neutral-500">
+                    Khổ A4 ngang • Có mục Giám đốc ký tên &amp; đóng mộc ở cuối trang • Chọn &quot;Save as PDF&quot; khi in để xuất file PDF
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() =>
+                      printPayrollHardcopy(payrolls, month, year, {
+                        preparedBy: preparedBy.trim() || undefined,
+                        directorName: directorName.trim() || "Nguyễn Đức Anh",
+                      })
+                    }
+                    className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Printer className="w-4 h-4" /> In bảng cứng / Xuất PDF
+                  </button>
+                  <button
+                    onClick={() => setShowPrintPreview(false)}
+                    className="p-2 rounded-lg border border-neutral-300 hover:bg-neutral-100 text-neutral-600 cursor-pointer"
+                    title="Đóng"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-5 py-3 bg-amber-50/50 border-b border-neutral-200 text-xs">
+                <div className="flex items-center gap-2">
+                  <label className="font-medium text-neutral-700 whitespace-nowrap">Người lập biểu:</label>
+                  <input
+                    value={preparedBy}
+                    onChange={(e) => setPreparedBy(e.target.value)}
+                    placeholder="VD: Nguyễn Thị Minh Phương"
+                    className="flex-1 border border-neutral-300 rounded-lg px-2.5 py-1.5 bg-white text-xs"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="font-medium text-neutral-700 whitespace-nowrap">Giám đốc ký duyệt:</label>
+                  <input
+                    value={directorName}
+                    onChange={(e) => setDirectorName(e.target.value)}
+                    placeholder="Nguyễn Đức Anh"
+                    className="flex-1 border border-neutral-300 rounded-lg px-2.5 py-1.5 bg-white text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-auto bg-neutral-200 p-4">
+                <iframe
+                  title="Xem trước bảng lương"
+                  srcDoc={buildPayrollPrintHtml(payrolls, month, year, {
+                    preparedBy: preparedBy.trim() || undefined,
+                    directorName: directorName.trim() || "Nguyễn Đức Anh",
+                  })}
+                  className="w-full h-[65vh] bg-white rounded-lg shadow border border-neutral-300"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+        <AttachmentPreviewModal
+          url={previewAttachment?.url || null}
+          title={previewAttachment?.title}
+          onClose={() => setPreviewAttachment(null)}
+        />
       </div>
     </AppShell>
   );

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
+import { TopKpiPodium, TopKpiMember } from "@/components/TopKpiPodium";
 import { formatVND, formatShortVND } from "@/lib/finance";
 import { exportToExcel } from "@/lib/export";
 import {
@@ -48,6 +49,7 @@ interface DashboardData {
     contractDurationChart: { name: string; revenue: number; count: number }[];
     salesChart: { name: string; revenue: number; contracts: number }[];
   };
+  topKpi?: TopKpiMember[];
   alerts: {
     pendingApprovals: number;
     pendingProjects: number;
@@ -63,15 +65,20 @@ const PIE_COLORS = ["#d97706", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string>("");
 
   useEffect(() => {
-    fetch("/api/dashboard")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        setData(d);
-        setLoading(false);
-      });
+    Promise.all([
+      fetch("/api/dashboard").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/auth/me").then((r) => (r.ok ? r.json() : null)),
+    ]).then(([d, me]) => {
+      setData(d);
+      setUserRole(me?.user?.role || "");
+      setLoading(false);
+    });
   }, []);
+
+  const canExport = userRole === "ADMIN" || userRole === "ACCOUNTANT";
 
   function handleExportExcel() {
     if (!data) return;
@@ -89,27 +96,44 @@ export default function DashboardPage() {
 
   return (
     <AppShell>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-neutral-900">Dashboard Tổng quan NDAHOME</h1>
-            <p className="text-sm text-neutral-500">
-              Theo dõi doanh thu, chi phí, lợi nhuận, ngân sách và các đầu việc cần phê duyệt
-            </p>
-          </div>
-          <div className="flex items-center gap-2 no-print">
-            <button
-              onClick={handleExportExcel}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium cursor-pointer"
-            >
-              <Download className="w-4 h-4" /> Xuất Excel
-            </button>
-            <button
-              onClick={() => window.print()}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white border border-neutral-300 hover:bg-neutral-50 text-neutral-700 text-sm font-medium cursor-pointer"
-            >
-              <Printer className="w-4 h-4" /> In / Xuất PDF
-            </button>
+      <div className="space-y-6 nda-page-enter">
+        {/* Executive Hero Header */}
+        <div className="relative overflow-hidden rounded-3xl border border-amber-400/40 bg-[#09090b] p-6 sm:p-7 text-white shadow-xl">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-25"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle at 85% 20%, rgba(251,191,36,0.35), transparent 45%), radial-gradient(circle at 15% 85%, rgba(16,185,129,0.2), transparent 45%)",
+            }}
+          />
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-amber-400 mb-1">
+                NDAHOME Executive Intelligence
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight bg-gradient-to-r from-white via-amber-100 to-amber-400 bg-clip-text text-transparent">
+                Dashboard Tổng quan NDAHOME
+              </h1>
+              <p className="text-xs sm:text-sm text-neutral-300 mt-1">
+                Theo dõi doanh thu, chi phí, lợi nhuận, ngân sách, bảng vàng KPI và các đầu việc cần phê duyệt
+              </p>
+            </div>
+            {canExport && (
+              <div className="flex items-center gap-2 no-print shrink-0">
+                <button
+                  onClick={handleExportExcel}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-200 text-xs font-bold backdrop-blur-md transition cursor-pointer"
+                >
+                  <Download className="w-4 h-4" /> Xuất Excel
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold backdrop-blur-md transition cursor-pointer"
+                >
+                  <Printer className="w-4 h-4" /> In / Xuất PDF
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -188,6 +212,9 @@ export default function DashboardPage() {
                 highlight="text-teal-700"
               />
             </div>
+
+            {/* Bảng vàng Top 3 KPI toàn công ty + hiệu ứng pháo hoa */}
+            {data.topKpi && data.topKpi.length > 0 && <TopKpiPodium topKpi={data.topKpi} />}
 
             {/* Thông tin cần chú ý */}
             <div className="bg-white rounded-xl border border-neutral-200 p-5">
@@ -380,13 +407,13 @@ function KpiCard({
 }) {
   return (
     <div
-      className={`rounded-xl border border-neutral-200 p-5 flex items-start justify-between cursor-default transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-xl active:translate-y-0 ${accent}`}
+      className={`rounded-2xl border border-neutral-200/90 p-5 flex items-start justify-between cursor-default shadow-xs transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-xl active:translate-y-0 ${accent}`}
     >
       <div>
         <div className="text-xs font-medium text-neutral-600">{title}</div>
-        <div className={`text-xl font-bold mt-1.5 tabular-nums ${highlight}`}>{value}</div>
+        <div className={`text-xl font-extrabold mt-1.5 tabular-nums ${highlight}`}>{value}</div>
       </div>
-      <div className={`w-10 h-10 rounded-lg ${bg} flex items-center justify-center shrink-0 shadow-xs`}>{icon}</div>
+      <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center shrink-0 shadow-xs`}>{icon}</div>
     </div>
   );
 }
@@ -413,7 +440,7 @@ function AlertTile({
   return (
     <Link
       href={href}
-      className={`p-3 rounded-lg border ${colorMap[color] || colorMap.amber} transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-md active:translate-y-0`}
+      className={`p-3.5 rounded-xl border ${colorMap[color] || colorMap.amber} transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-md active:translate-y-0`}
     >
       <div className="text-2xl font-bold tabular-nums">{count}</div>
       <div className="text-xs font-medium mt-0.5">{label}</div>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { readContractSplits, allocateContractRevenue } from "@/lib/contractSplits";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -17,6 +18,8 @@ export async function GET() {
     projects,
     attendances,
     departments,
+    salesUsers,
+    splits,
   ] = await Promise.all([
     prisma.transaction.findMany({ include: { department: true, category: true } }),
     prisma.contract.findMany({ include: { sales: true } }),
@@ -28,6 +31,11 @@ export async function GET() {
     prisma.project.findMany(),
     prisma.attendance.findMany({ where: { date: "2026-11-19" } }),
     prisma.department.findMany(),
+    prisma.user.findMany({
+      where: { isActive: true, role: "SALES" },
+      select: { id: true, fullName: true, employeeCode: true, position: true, avatar: true, kpiTarget: true },
+    }),
+    readContractSplits(),
   ]);
 
   // Tổng thu & tổng chi (chỉ tính các khoản đã duyệt)
@@ -83,16 +91,46 @@ export async function GET() {
     { name: "Hợp đồng 12 tháng (70-100%)", revenue: rev12m, count: contracts.filter((c) => c.durationMonths === 12).length },
   ];
 
-  // Doanh số nhân viên Sales
-  const salesMap: Record<string, { name: string; revenue: number; contracts: number }> = {};
-  for (const c of contracts) {
-    if (!salesMap[c.salesId]) {
-      salesMap[c.salesId] = { name: c.sales.fullName, revenue: 0, contracts: 0 };
-    }
-    salesMap[c.salesId].revenue += c.companyRevenue;
-    salesMap[c.salesId].contracts += 1;
-  }
-  const salesChart = Object.values(salesMap).sort((a, b) => b.revenue - a.revenue);
+  // Doanh số nhân viên Sales (chỉ tính hợp đồng Đã thuê ACTIVE & áp dụng chia 50/50 Online-Offline)
+  const activeContracts = contracts.filter((c) => c.status === "ACTIVE" || c.status === "FORFEITED");
+  const allocatedStats = allocateContractRevenue(activeContracts, splits);
+  const salesUserMap = new Map(salesUsers.map((u) => [u.id, u]));
+
+  const salesChart = Object.entries(allocatedStats)
+    .map(([uid, stat]) => {
+      const su = salesUserMap.get(uid);
+      const fallbackName = contracts.find((c) => c.salesId === uid)?.sales?.fullName || "Nhân viên Sales";
+      return {
+        name: su?.fullName || fallbackName,
+        revenue: stat.revenue,
+        contracts: stat.contractCount,
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue);
+
+  // Top 3 nhân viên đạt KPI cao nhất công ty
+  const topKpi = salesUsers
+    .map((u) => {
+      const stat = allocatedStats[u.id];
+      const revenue = stat?.revenue || 0;
+      const contractCount = stat?.contractCount || 0;
+      const kpiTarget = u.kpiTarget > 0 ? u.kpiTarget : 15_000_000;
+      const kpiPercent = Math.round((revenue / kpiTarget) * 100);
+      return {
+        id: u.id,
+        fullName: u.fullName,
+        employeeCode: u.employeeCode,
+        position: u.position,
+        avatar: u.avatar,
+        revenue,
+        contractCount,
+        kpiTarget,
+        kpiPercent,
+      };
+    })
+    .filter((m) => m.revenue > 0)
+    .sort((a, b) => b.kpiPercent - a.kpiPercent || b.revenue - a.revenue)
+    .slice(0, 3);
 
   // Thông tin cần chú ý
   const alerts = {
@@ -121,6 +159,7 @@ export async function GET() {
       contractDurationChart,
       salesChart,
     },
+    topKpi,
     alerts,
     pendingApprovalsList: approvals.slice(0, 5),
     overBudgetList: budgets.filter((b) => b.usedAmount > b.allocatedAmount || b.status === "EXCEEDED"),

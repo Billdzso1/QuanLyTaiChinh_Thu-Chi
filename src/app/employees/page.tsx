@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { formatVND, formatDate } from "@/lib/finance";
-import { Users, Shield, Plus, Clock, GraduationCap, Upload, X, Search } from "lucide-react";
+import { ROLE_VI_LABELS } from "@/lib/labels";
+import { Users, Shield, Plus, Clock, GraduationCap, Upload, X, Search, CheckCircle2, UserX } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -48,7 +49,7 @@ interface AttendanceDetail {
 export default function EmployeesPage() {
   const [users, setUsers] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Dept[]>([]);
-  const [typeFilter, setTypeFilter] = useState<"ALL" | "FULL_TIME" | "INTERN">("ALL");
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "FULL_TIME" | "INTERN" | "PENDING">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -168,9 +169,30 @@ export default function EmployeesPage() {
     setDetailLoading(false);
   }
 
+  async function handleApproveUser(userId: string) {
+    const res = await fetch("/api/employees", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: userId, isActive: true }),
+    });
+    if (res.ok) {
+      loadData();
+    }
+  }
+
+  async function handleRejectUser(u: Employee) {
+    if (!window.confirm(`Từ chối và xóa yêu cầu đăng ký của ${u.fullName} (${u.email})?`)) return;
+    const res = await fetch(`/api/employees?id=${u.id}`, { method: "DELETE" });
+    if (res.ok) {
+      loadData();
+    }
+  }
+
+  const pendingUsers = users.filter((u) => !u.isActive);
   const fullTimeCount = users.filter((u) => u.employmentType !== "INTERN").length;
   const internCount = users.filter((u) => u.employmentType === "INTERN").length;
   const filteredUsers = users.filter((u) => {
+    if (typeFilter === "PENDING" && u.isActive) return false;
     if (typeFilter === "FULL_TIME" && u.employmentType === "INTERN") return false;
     if (typeFilter === "INTERN" && u.employmentType !== "INTERN") return false;
     if (searchQuery.trim()) {
@@ -205,6 +227,49 @@ export default function EmployeesPage() {
           </button>
         </div>
 
+        {/* Tài khoản mới đăng ký chờ Admin duyệt */}
+        {pendingUsers.length > 0 && (
+          <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="font-bold text-sm text-neutral-950 flex items-center gap-2">
+                <Shield className="w-4 h-4 text-amber-600" />
+                Tài khoản đăng ký mới đang chờ Admin duyệt ({pendingUsers.length})
+              </div>
+              <span className="text-xs text-amber-800">Chỉ sau khi duyệt, nhân sự mới có thể đăng nhập.</span>
+            </div>
+            <div className="divide-y divide-amber-200 bg-white rounded-lg border border-amber-200">
+              {pendingUsers.map((pu) => (
+                <div key={pu.id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-sm text-neutral-900">
+                      {pu.fullName}{" "}
+                      <span className="text-xs font-mono text-amber-700">({pu.employeeCode})</span>
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                      {pu.email} {pu.phone ? `• ${pu.phone}` : ""} • {pu.department.name} •{" "}
+                      {pu.employmentType === "INTERN" ? "Thực tập sinh" : "Chính thức"}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleApproveUser(pu.id)}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Duyệt kích hoạt
+                    </button>
+                    <button
+                      onClick={() => handleRejectUser(pu)}
+                      className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <UserX className="w-3.5 h-3.5" /> Từ chối
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Departments */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {departments.map((d) => (
@@ -226,6 +291,7 @@ export default function EmployeesPage() {
               { key: "ALL", label: `Tất cả (${users.length})` },
               { key: "FULL_TIME", label: `Nhân viên chính thức (${fullTimeCount})` },
               { key: "INTERN", label: `Thực tập sinh (${internCount})` },
+              { key: "PENDING", label: `Chờ duyệt (${pendingUsers.length})` },
             ].map((t) => (
               <button
                 key={t.key}
@@ -325,7 +391,7 @@ export default function EmployeesPage() {
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1 items-start">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 text-amber-700 text-xs font-medium">
-                          <Shield className="w-3 h-3" /> {u.role}
+                          <Shield className="w-3 h-3" /> {ROLE_VI_LABELS[u.role] || u.role}
                         </span>
                         <button
                           onClick={() => toggleTeamLead(u)}

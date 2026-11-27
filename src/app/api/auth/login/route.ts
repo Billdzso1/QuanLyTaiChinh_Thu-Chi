@@ -2,11 +2,19 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signSessionToken, SESSION_COOKIE, UserRole } from "@/lib/auth";
+import { verifyHumanToken } from "@/lib/humanGuard";
 import { logAudit } from "@/lib/audit";
 
 export async function POST(request: Request) {
   try {
-    const { email, password } = await request.json();
+    const { email, password, humanToken } = await request.json();
+    const isHuman = await verifyHumanToken(humanToken);
+    if (!isHuman) {
+      return NextResponse.json(
+        { error: "Vui lòng xác nhận 'Tôi không phải là người máy' trước khi đăng nhập." },
+        { status: 400 }
+      );
+    }
     if (!email || !password) {
       return NextResponse.json({ error: "Vui lòng nhập email và mật khẩu" }, { status: 400 });
     }
@@ -16,8 +24,15 @@ export async function POST(request: Request) {
       include: { department: true },
     });
 
-    if (!user || !user.isActive) {
-      return NextResponse.json({ error: "Tài khoản không tồn tại hoặc đã bị khóa" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Tài khoản không tồn tại" }, { status: 401 });
+    }
+
+    if (!user.isActive) {
+      return NextResponse.json(
+        { error: "Tài khoản của bạn đang chờ Admin phê duyệt hoặc đã bị khóa. Vui lòng liên hệ Giám đốc." },
+        { status: 403 }
+      );
     }
 
     const valid = await bcrypt.compare(String(password), user.passwordHash);
@@ -44,6 +59,7 @@ export async function POST(request: Request) {
     });
 
     const response = NextResponse.json({
+      token,
       user: {
         id: user.id,
         employeeCode: user.employeeCode,

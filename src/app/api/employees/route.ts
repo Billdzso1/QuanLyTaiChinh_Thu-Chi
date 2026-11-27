@@ -96,12 +96,55 @@ export async function PATCH(request: Request) {
 
   await logAudit({
     userId: user.id,
-    action: "UPDATE_USER",
+    action: body.isActive === true ? "APPROVE_USER" : "UPDATE_USER",
     entity: "User",
     entityId: updated.id,
-    details: `Cập nhật nhân sự ${updated.fullName} (Role: ${updated.role})`,
+    details: `${body.isActive === true ? "Duyệt kích hoạt" : "Cập nhật"} nhân sự ${updated.fullName} (Role: ${updated.role})`,
   });
+
+  if (body.isActive === true) {
+    await prisma.notification.create({
+      data: {
+        userId: updated.id,
+        title: "Tài khoản đã được Admin duyệt",
+        message: "Tài khoản của bạn đã được Giám đốc phê duyệt kích hoạt. Bạn có thể sử dụng đầy đủ hệ thống NDAHOME.",
+        type: "SUCCESS",
+        link: "/",
+      },
+    });
+  }
 
   const { passwordHash: _, ...rest } = updated;
   return NextResponse.json({ user: rest });
+}
+
+export async function DELETE(request: Request) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Chỉ Giám đốc mới có quyền xóa / từ chối tài khoản" }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+  const target = await prisma.user.findUnique({ where: { id } });
+  if (!target) return NextResponse.json({ error: "Không tìm thấy tài khoản" }, { status: 404 });
+  if (target.isActive) {
+    return NextResponse.json({ error: "Chỉ có thể xóa trực tiếp tài khoản đang chờ duyệt." }, { status: 400 });
+  }
+
+  await prisma.notification.deleteMany({ where: { userId: id } });
+  await prisma.auditLog.deleteMany({ where: { userId: id } });
+  await prisma.user.delete({ where: { id } });
+
+  await logAudit({
+    userId: user.id,
+    action: "REJECT_USER",
+    entity: "User",
+    entityId: id,
+    details: `Từ chối & xóa tài khoản đăng ký ${target.fullName} (${target.email})`,
+  });
+
+  return NextResponse.json({ ok: true });
 }

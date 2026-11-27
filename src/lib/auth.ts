@@ -1,8 +1,8 @@
 import { SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { prisma } from "./prisma";
 
-export type UserRole = "ADMIN" | "ACCOUNTANT" | "SALES" | "IT" | "MARKETING";
+export type UserRole = "ADMIN" | "ACCOUNTANT" | "SALES" | "IT" | "MARKETING" | "LANDLORD";
 
 export interface SessionPayload {
   userId: string;
@@ -39,6 +39,12 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
+  const headerStore = await headers();
+  const tabToken = headerStore.get("x-tab-token");
+  if (tabToken) {
+    const tabPayload = await verifySessionToken(tabToken);
+    if (tabPayload) return tabPayload;
+  }
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -74,6 +80,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   SALES: "Nhân viên Sales",
   IT: "Nhân viên IT",
   MARKETING: "Nhân viên Marketing",
+  LANDLORD: "Chủ trọ / Đối tác",
 };
 
 export { SESSION_COOKIE };

@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CompanyLogo } from "./CompanyLogo";
+import { TopKpiCelebrationModal } from "./TopKpiCelebrationModal";
 import {
   LayoutDashboard,
   Wallet,
@@ -25,6 +26,9 @@ import {
   Phone,
   Mail,
   ArrowUp,
+  Briefcase,
+  Home,
+  Zap,
 } from "lucide-react";
 
 export interface CurrentUser {
@@ -34,7 +38,7 @@ export interface CurrentUser {
   fullName: string;
   phone?: string;
   avatar?: string | null;
-  role: "ADMIN" | "ACCOUNTANT" | "SALES" | "IT" | "MARKETING";
+  role: "ADMIN" | "ACCOUNTANT" | "SALES" | "IT" | "MARKETING" | "LANDLORD";
   position: string;
   isTeamLead: boolean;
   baseSalary: number;
@@ -65,6 +69,24 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["ADMIN", "ACCOUNTANT", "SALES"],
   },
   {
+    href: "/landlord",
+    label: "Cổng Chủ trọ & Phòng",
+    icon: <Home className="w-4 h-4" />,
+    roles: ["LANDLORD"],
+  },
+  {
+    href: "/landlord/utilities",
+    label: "Điện – Nước & Tiền phòng",
+    icon: <Zap className="w-4 h-4" />,
+    roles: ["LANDLORD"],
+  },
+  {
+    href: "/landlord/operations",
+    label: "Cư dân, Tạm trú & Vận hành",
+    icon: <Users className="w-4 h-4" />,
+    roles: ["LANDLORD"],
+  },
+  {
     href: "/payroll",
     label: "Quản lý Lương & Hoa hồng",
     icon: <BadgeDollarSign className="w-4 h-4" />,
@@ -76,13 +98,8 @@ const NAV_ITEMS: NavItem[] = [
     icon: <Clock className="w-4 h-4" />,
   },
   {
-    href: "/budgets",
-    label: "Ngân sách Phòng ban",
-    icon: <PiggyBank className="w-4 h-4" />,
-  },
-  {
     href: "/approvals",
-    label: "Đề xuất & Phê duyệt",
+    label: "Ngân sách & Phê duyệt",
     icon: <CheckSquare className="w-4 h-4" />,
   },
   {
@@ -102,6 +119,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Nhân sự & Phân quyền",
     icon: <Users className="w-4 h-4" />,
     roles: ["ADMIN", "ACCOUNTANT"],
+  },
+  {
+    href: "/recruitment",
+    label: "Hồ sơ & Lương Giám đốc",
+    icon: <Briefcase className="w-4 h-4" />,
+    roles: ["ADMIN"],
   },
   {
     href: "/profile",
@@ -128,6 +151,31 @@ interface NotificationItem {
 
 let cachedUser: CurrentUser | null = null;
 let cachedUnreadCount = 0;
+let fetchPatched = false;
+
+function ensureTabFetchInterceptor() {
+  if (typeof window === "undefined" || fetchPatched) return;
+  fetchPatched = true;
+  const origFetch = window.fetch.bind(window);
+  window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.pathname : input.url;
+    if (url.startsWith("/api/")) {
+      const tabToken = sessionStorage.getItem("ndahome_tab_token");
+      if (tabToken) {
+        const nextHeaders = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+        if (!nextHeaders.has("x-tab-token")) {
+          nextHeaders.set("x-tab-token", tabToken);
+        }
+        return origFetch(input, { ...init, headers: nextHeaders });
+      }
+    }
+    return origFetch(input, init);
+  };
+}
+
+if (typeof window !== "undefined") {
+  ensureTabFetchInterceptor();
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -155,18 +203,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    if (!cachedUser) {
-      fetch("/api/auth/me")
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d) => {
-          if (d?.user) {
-            cachedUser = d.user;
-            setUser(d.user);
-          } else {
-            router.push("/login");
-          }
-        });
-    }
+    ensureTabFetchInterceptor();
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.user) {
+          cachedUser = d.user;
+          setUser(d.user);
+        } else {
+          cachedUser = null;
+          router.push("/login");
+        }
+      });
     loadNotifications();
   }, [router]);
 
@@ -182,22 +230,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   async function handleLogout() {
     cachedUser = null;
     cachedUnreadCount = 0;
+    sessionStorage.removeItem("ndahome_tab_token");
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   }
 
-  const filteredNav = NAV_ITEMS.filter(
-    (item) => !item.roles || (user && item.roles.includes(user.role))
-  );
+  const filteredNav =
+    user?.role === "LANDLORD"
+      ? NAV_ITEMS.filter(
+          (item) =>
+            item.href === "/landlord" ||
+            item.href === "/landlord/utilities" ||
+            item.href === "/landlord/operations" ||
+            item.href === "/profile"
+        )
+      : NAV_ITEMS.filter((item) => !item.roles || (user && item.roles.includes(user.role)));
 
   return (
-    <div className="h-screen overflow-hidden flex bg-neutral-50 text-neutral-900">
+    <div className="h-screen overflow-hidden flex bg-gradient-to-br from-stone-50 via-neutral-50 to-amber-50/35 text-neutral-900">
       {/* Sidebar Desktop */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:h-screen bg-neutral-950 text-white shrink-0 border-r border-amber-500/20">
-        <div className="h-16 shrink-0 flex items-center gap-3 px-5 border-b border-neutral-800">
+      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:h-screen bg-gradient-to-b from-[#09090b] via-[#0d0d11] to-[#15120b] text-white shrink-0 border-r border-amber-500/25 shadow-2xl">
+        <div className="h-16 shrink-0 flex items-center gap-3 px-5 border-b border-white/10">
           <CompanyLogo size={36} />
           <div>
-            <div className="font-bold text-sm tracking-wide text-amber-400">NDAHOME</div>
+            <div className="font-extrabold text-sm tracking-wider bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-500 bg-clip-text text-transparent">
+              NDAHOME
+            </div>
             <div className="text-[11px] text-neutral-400">Quản lý nội bộ</div>
           </div>
         </div>
@@ -210,13 +268,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 prefetch={true}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${active
-                  ? "bg-amber-500 text-neutral-950 font-bold"
-                  : "text-neutral-300 hover:bg-neutral-900 hover:text-amber-400"
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm transition-all duration-200 ${active
+                  ? "bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 text-neutral-950 font-extrabold shadow-[0_6px_18px_-4px_rgba(251,191,36,0.5)]"
+                  : "text-neutral-300 hover:bg-white/[0.06] hover:text-amber-300 hover:translate-x-1"
                   }`}
               >
                 {item.icon}
-                <span>{item.label}</span>
+                <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
@@ -261,7 +319,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         onScroll={(e) => setShowBackToTop(e.currentTarget.scrollTop > 250)}
         className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto scroll-smooth"
       >
-        <header className="h-16 bg-white border-b border-neutral-200 px-4 lg:px-8 flex items-center justify-between sticky top-0 z-20">
+        <header className="h-16 bg-white/80 backdrop-blur-xl border-b border-neutral-200/80 px-4 lg:px-8 flex items-center justify-between sticky top-0 z-20 shadow-[0_2px_14px_rgba(0,0,0,0.03)]">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileOpen(true)}
@@ -384,7 +442,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto">{children}</main>
+        <main key={pathname} className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto nda-page-enter">
+          {children}
+        </main>
 
         <footer className="bg-neutral-950 text-neutral-300 border-t border-amber-500/30 px-4 lg:px-8 py-10 mt-8 no-print">
           <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -489,6 +549,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         )}
       </div>
+      <TopKpiCelebrationModal userRole={user?.role} userName={user?.fullName} />
     </div>
   );
 }

@@ -3,8 +3,55 @@
 import React, { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { formatVND, formatDate, calculateSalesCommission } from "@/lib/finance";
-import { getStatusLabel } from "@/lib/labels";
-import { Plus, Trophy, Building, Users, FileCheck2, Upload, Image as ImageIcon, X, User, Phone, Calendar, FileText, Pencil, Trash2 } from "lucide-react";
+import { getStatusLabel, SOURCE_LABELS } from "@/lib/labels";
+import { buildDepositReceiptHtml, printDepositReceiptPdf, DepositReceiptData } from "@/lib/depositReceiptPrint";
+import { AttachmentPreviewModal, isImageUrl } from "@/components/AttachmentPreviewModal";
+import { RoomStatusFilterSelect } from "@/components/RoomStatusFilterSelect";
+import { PaymentVerificationFields, PaymentMethodType } from "@/components/PaymentVerificationFields";
+import { Plus, Trophy, Building, Users, FileCheck2, Upload, Image as ImageIcon, X, User, Phone, Calendar, FileText, Pencil, Trash2, MapPin, ExternalLink, Search, CheckCircle2, Sparkles, CalendarPlus, Clock, Printer, MessageCircle } from "lucide-react";
+
+const ROOM_AMENITY_OPTIONS = [
+  "Full nội thất",
+  "Máy lạnh",
+  "Ban công",
+  "Thang máy",
+  "Khóa vân tay",
+  "Gác lửng",
+  "Kệ bếp",
+  "Tủ lạnh",
+  "Máy giặt riêng",
+  "Cửa sổ lớn",
+  "Hầm giữ xe",
+  "WiFi tốc độ cao",
+  "Nuôi pet nhỏ",
+];
+
+function toggleAmenityValue(current: string, item: string): string {
+  const list = current
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const exists = list.some((s) => s.toLowerCase() === item.toLowerCase());
+  const next = exists
+    ? list.filter((s) => s.toLowerCase() !== item.toLowerCase())
+    : [...list, item];
+  return next.join(", ");
+}
+
+function hasAmenityValue(current: string, item: string): boolean {
+  return current
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .includes(item.toLowerCase());
+}
+
+const ROOM_TYPE_LABELS: Record<string, string> = {
+  PHONG_TRO: "Phòng trọ",
+  PHONG_THUONG: "Thuê phòng thường",
+  CHUNG_CU: "Chung cư / CHDV",
+  STUDIO: "Studio / Duplex",
+  NHA_NGUYEN_CAN: "Nhà nguyên căn",
+};
 
 interface Contract {
   id: string;
@@ -16,8 +63,11 @@ interface Contract {
   companyRevenue: number;
   landlordPayable: number;
   signedDate: string;
-  customer: { fullName: string; phone: string };
-  room: { roomNumber: string; property: { name: string } };
+  status?: string;
+  note?: string | null;
+  invoiceUrl?: string | null;
+  customer: { fullName: string; phone: string; idCard?: string | null };
+  room: { roomNumber: string; property: { name: string; address?: string; district?: string } };
   sales: { id: string; fullName: string };
   deposits: {
     id: string;
@@ -33,6 +83,8 @@ interface Contract {
 export default function SalesPage() {
   const [tab, setTab] = useState<"CONTRACTS" | "ROOMS" | "CUSTOMERS" | "LEADERBOARD">("CONTRACTS");
   const [contracts, setContracts] = useState<Contract[]>([]);
+  const [salesStats, setSalesStats] = useState<Record<string, { contractCount: number; revenue: number }>>({});
+  const [currentUserRole, setCurrentUserRole] = useState<string>("");
   interface RoomContractInfo {
     id: string;
     contractCode: string;
@@ -71,25 +123,95 @@ export default function SalesPage() {
   interface RoomItem {
     id: string;
     roomNumber: string;
+    roomType?: string;
     floor: number;
     area: number;
     price: number;
     status: string;
     amenities?: string | null;
     imageUrl?: string | null;
-    property: { name: string; address?: string; district: string; landlordName?: string; landlordPhone?: string };
+    property: { id?: string; name: string; address?: string; district: string; landlordName?: string; landlordPhone?: string };
     contracts?: RoomContractInfo[];
+  }
+
+  interface RoomViewingItem {
+    id: string;
+    code: string;
+    roomId: string;
+    roomLabel: string;
+    propertyName?: string;
+    roomNumber?: string;
+    roomImage?: string | null;
+    address?: string;
+    district: string;
+    price: number;
+    customerId: string;
+    customerName: string;
+    customerPhone: string;
+    salesId: string;
+    salesName: string;
+    onlineSalesId?: string;
+    onlineSalesName?: string;
+    hybridMode?: string;
+    reminderMinutes?: number;
+    viewingAt: string;
+    note?: string;
+    status: "SCHEDULED" | "VIEWED" | "CONTRACTED" | "CANCELLED";
   }
 
   const [crm, setCrm] = useState<{
     customers: { id: string; fullName: string; phone: string; email?: string | null; idCard?: string | null; source: string; status: string; note?: string | null; sales: { fullName: string } }[];
-    properties: { id: string; name: string; district: string }[];
+    properties: { id: string; name: string; district: string; address?: string; landlordName?: string; landlordPhone?: string }[];
     rooms: RoomItem[];
     salesUsers: { id: string; fullName: string; kpiTarget: number }[];
-  }>({ customers: [], properties: [], rooms: [], salesUsers: [] });
+    viewings?: RoomViewingItem[];
+  }>({ customers: [], properties: [], rooms: [], salesUsers: [], viewings: [] });
 
   const [showContractModal, setShowContractModal] = useState(false);
   const [showRoomModal, setShowRoomModal] = useState(false);
+  const [showViewingModal, setShowViewingModal] = useState(false);
+  const [depositModalViewing, setDepositModalViewing] = useState<RoomViewingItem | null>(null);
+  const [depositForm, setDepositForm] = useState({
+    depositAmount: "",
+    durationMonths: "12",
+    moveInDate: "",
+    note: "",
+    customerIdCard: "",
+    paymentMethod: "TRANSFER" as PaymentMethodType,
+    transferAmount: "",
+    cashAmount: "",
+    evidenceUrl: "",
+  });
+  const [signRentContract, setSignRentContract] = useState<Contract | null>(null);
+  const [signRentForm, setSignRentForm] = useState({
+    customerIdCard: "",
+    paymentMethod: "TRANSFER" as PaymentMethodType,
+    transferAmount: "",
+    cashAmount: "",
+    evidenceUrl: "",
+    note: "",
+  });
+  const [cancelDepositContract, setCancelDepositContract] = useState<Contract | null>(null);
+  const [cancelDepositForm, setCancelDepositForm] = useState({
+    holdDays: "7",
+    collectedDeposit: "",
+    note: "",
+  });
+  const [receiptModalData, setReceiptModalData] = useState<DepositReceiptData | null>(null);
+  const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
+  const [viewingForm, setViewingForm] = useState({
+    propertyId: "",
+    roomId: "",
+    customerMode: "NEW" as "EXISTING" | "NEW",
+    customerId: "__NEW__",
+    customerName: "",
+    customerPhone: "",
+    salesId: "SELF",
+    hybridMode: "SELF_100" as "SELF_100" | "POOL_40_60" | "TEAM_40_60",
+    reminderMinutes: 30,
+    viewingAt: "",
+    note: "",
+  });
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [newCustForm, setNewCustForm] = useState({
     fullName: "",
@@ -108,11 +230,27 @@ export default function SalesPage() {
   const [roomError, setRoomError] = useState("");
   const [editRoomForm, setEditRoomForm] = useState({
     roomNumber: "",
+    roomType: "PHONG_TRO",
     floor: "1",
     area: "25",
     price: "6000000",
     amenities: "",
     status: "AVAILABLE",
+  });
+  const [roomSearch, setRoomSearch] = useState("");
+  const [roomDistrict, setRoomDistrict] = useState("ALL");
+  const [roomPropertyFilter, setRoomPropertyFilter] = useState("ALL");
+  const [roomPriceRange, setRoomPriceRange] = useState("ALL");
+  const [roomTypeFilter, setRoomTypeFilter] = useState("ALL");
+  const [roomStatusFilter, setRoomStatusFilter] = useState("ALL");
+  const [showPropertyModal, setShowPropertyModal] = useState(false);
+  const [editingPropertyId, setEditingPropertyId] = useState<string | null>(null);
+  const [propertyForm, setPropertyForm] = useState({
+    name: "",
+    district: "Bình Thạnh",
+    address: "",
+    landlordName: "",
+    landlordPhone: "",
   });
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [editCustForm, setEditCustForm] = useState({
@@ -127,7 +265,11 @@ export default function SalesPage() {
   const [uploadingRoomImg, setUploadingRoomImg] = useState(false);
   const [roomForm, setRoomForm] = useState({
     propertyId: "",
+    propertyName: "",
+    district: "",
+    address: "",
     roomNumber: "",
+    roomType: "PHONG_TRO",
     floor: "1",
     area: "25",
     price: "6000000",
@@ -146,10 +288,19 @@ export default function SalesPage() {
   });
 
   async function loadData() {
-    const [cRes, crmRes] = await Promise.all([fetch("/api/sales/contracts"), fetch("/api/sales/crm")]);
+    const [cRes, crmRes, meRes] = await Promise.all([
+      fetch("/api/sales/contracts"),
+      fetch("/api/sales/crm"),
+      fetch("/api/auth/me"),
+    ]);
+    if (meRes.ok) {
+      const meData = await meRes.json();
+      setCurrentUserRole(meData.user?.role || "");
+    }
     if (cRes.ok) {
       const d = await cRes.json();
-      setContracts(d.contracts);
+      setContracts(d.contracts || []);
+      setSalesStats(d.salesStats || {});
     }
     if (crmRes.ok) {
       const d = await crmRes.json();
@@ -163,6 +314,7 @@ export default function SalesPage() {
       setRoomForm((rf) => ({
         ...rf,
         propertyId: rf.propertyId || d.properties?.[0]?.id || "",
+        district: rf.district || d.properties?.[0]?.district || "",
       }));
       setNewCustForm((cf) => ({
         ...cf,
@@ -212,6 +364,42 @@ export default function SalesPage() {
       }
     }
     setUploadingInvoice(false);
+  }
+
+  async function handleCreateProperty(e: React.FormEvent) {
+    e.preventDefault();
+    const res = await fetch("/api/sales/crm", {
+      method: editingPropertyId ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(
+        editingPropertyId
+          ? { entity: "PROPERTY", id: editingPropertyId, ...propertyForm }
+          : { entity: "PROPERTY", ...propertyForm }
+      ),
+    });
+    if (res.ok) {
+      const saved = await res.json();
+      setShowPropertyModal(false);
+      setEditingPropertyId(null);
+      setRoomDistrict(propertyForm.district);
+      if (saved.property?.id) {
+        setRoomPropertyFilter(saved.property.id);
+      }
+      setPropertyForm({ name: "", district: propertyForm.district, address: "", landlordName: "", landlordPhone: "" });
+      loadData();
+    }
+  }
+
+  async function handleDeleteProperty(propId: string, propName: string) {
+    if (!window.confirm(`Xóa khu vực "${propName}"?`)) return;
+    const res = await fetch(`/api/sales/crm?entity=PROPERTY&id=${propId}`, { method: "DELETE" });
+    if (res.ok) {
+      setRoomPropertyFilter("ALL");
+      loadData();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      window.alert(d.error || "Không thể xóa khu vực này");
+    }
   }
 
   async function handleCreateRoom(e: React.FormEvent) {
@@ -297,6 +485,125 @@ export default function SalesPage() {
     loadData();
   }, []);
 
+  async function handleCreateViewing(e: React.FormEvent) {
+    e.preventDefault();
+    const res = await fetch("/api/sales/crm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        entity: "VIEWING",
+        ...viewingForm,
+        customerId: viewingForm.customerMode === "NEW" ? "__NEW__" : viewingForm.customerId,
+        salesId: viewingForm.salesId === "SELF" || viewingForm.salesId === "POOL" ? undefined : viewingForm.salesId,
+      }),
+    });
+    if (res.ok) {
+      setShowViewingModal(false);
+      setViewingForm((vf) => ({ ...vf, customerName: "", customerPhone: "", note: "" }));
+      loadData();
+    }
+  }
+
+  async function handleUpdateViewingStatus(id: string, status: string) {
+    await fetch("/api/sales/crm", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entity: "VIEWING", id, status }),
+    });
+    loadData();
+  }
+
+  async function handleConfirmDepositFromViewing(e: React.FormEvent) {
+    e.preventDefault();
+    if (!depositModalViewing) return;
+    const v = depositModalViewing;
+    const depAmount = Number(depositForm.depositAmount) || v.price;
+    const durMonths = Number(depositForm.durationMonths) === 6 ? 6 : 12;
+    const rate = durMonths === 6 ? 0.5 : 0.8;
+
+    const res = await fetch("/api/sales/contracts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerId: v.customerId,
+        roomId: v.roomId,
+        salesId: v.salesId,
+        onlineSalesId: v.onlineSalesId,
+        hybridMode: v.hybridMode,
+        durationMonths: durMonths,
+        monthlyRent: v.price,
+        depositAmount: depAmount,
+        companyCommissionRate: rate,
+        collectedAmount: depAmount,
+        isDepositOnly: true,
+        signedDate: depositForm.moveInDate || undefined,
+        note: depositForm.note,
+        customerIdCard: depositForm.customerIdCard,
+        paymentMethod: depositForm.paymentMethod,
+        transferAmount: depositForm.transferAmount,
+        cashAmount: depositForm.cashAmount,
+        evidenceUrl: depositForm.evidenceUrl,
+      }),
+    });
+    if (res.ok) {
+      const created = await res.json();
+      await handleUpdateViewingStatus(v.id, "CONTRACTED");
+      setDepositModalViewing(null);
+      setReceiptModalData({
+        contractCode: created.contract?.contractCode || v.code,
+        customerName: v.customerName,
+        customerPhone: v.customerPhone,
+        customerIdCard: depositForm.customerIdCard || undefined,
+        roomLabel: v.roomLabel,
+        address: [v.address, v.district].filter(Boolean).join(", "),
+        monthlyRent: v.price,
+        depositAmount: depAmount,
+        collectedAmount: depAmount,
+        durationMonths: durMonths,
+        moveInDate: depositForm.moveInDate || new Date().toISOString(),
+        salesName: v.salesName,
+        paymentMethodLabel:
+          depositForm.paymentMethod === "TRANSFER"
+            ? "Chuyển khoản"
+            : depositForm.paymentMethod === "CASH"
+              ? "Tiền mặt"
+              : `Chuyển khoản (${formatVND(Number(depositForm.transferAmount || 0))}) + Tiền mặt (${formatVND(Number(depositForm.cashAmount || 0))})`,
+        evidenceUrl: depositForm.evidenceUrl || undefined,
+        note: depositForm.note,
+      });
+      await loadData();
+    }
+  }
+
+  function openViewingModalForRoom(roomId?: string) {
+    const targetRoom =
+      (roomId ? crm.rooms.find((r) => r.id === roomId) : undefined) ||
+      crm.rooms.find((r) => r.status === "AVAILABLE") ||
+      crm.rooms[0];
+    const matchedProp = targetRoom
+      ? crm.properties.find((p) => p.name === targetRoom.property.name && p.district === targetRoom.property.district) ||
+        crm.properties[0]
+      : crm.properties[0];
+
+    const now = new Date();
+    now.setHours(now.getHours() + 2, 0, 0, 0);
+    const localDt = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    setViewingForm({
+      propertyId: matchedProp?.id || "",
+      roomId: targetRoom?.id || "",
+      customerMode: "NEW",
+      customerId: crm.customers[0]?.id || "__NEW__",
+      customerName: "",
+      customerPhone: "",
+      salesId: "SELF",
+      hybridMode: "SELF_100",
+      reminderMinutes: 30,
+      viewingAt: localDt,
+      note: "",
+    });
+    setShowViewingModal(true);
+  }
+
   async function handleCreateContract(e: React.FormEvent) {
     e.preventDefault();
     const res = await fetch("/api/sales/contracts", {
@@ -310,29 +617,103 @@ export default function SalesPage() {
     }
   }
 
-  async function handleDepositAction(depositId: string, action: "COLLECT_DEPOSIT" | "PAY_LANDLORD") {
+  function openSignRentModal(c: Contract) {
+    setSignRentForm({
+      customerIdCard: c.customer.idCard || "",
+      paymentMethod: "TRANSFER",
+      transferAmount: String(c.depositAmount || ""),
+      cashAmount: "",
+      evidenceUrl: c.invoiceUrl || "",
+      note: "",
+    });
+    setSignRentContract(c);
+  }
+
+  async function handleConfirmSignAndRent(e: React.FormEvent) {
+    e.preventDefault();
+    if (!signRentContract) return;
+    const dep = signRentContract.deposits[0];
+    if (!dep) return;
+    await fetch("/api/sales/contracts", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        depositId: dep.id,
+        action: "SIGN_AND_RENT",
+        customerIdCard: signRentForm.customerIdCard,
+        paymentMethod: signRentForm.paymentMethod,
+        transferAmount: signRentForm.transferAmount,
+        cashAmount: signRentForm.cashAmount,
+        evidenceUrl: signRentForm.evidenceUrl,
+        note: signRentForm.note,
+      }),
+    });
+    setSignRentContract(null);
+    setSelectedContract(null);
+    loadData();
+  }
+
+  function openCancelDepositModal(c: Contract) {
+    const dep = c.deposits[0];
+    const collected = dep && dep.collectedAmount > 0 ? dep.collectedAmount : c.depositAmount;
+    setCancelDepositForm({
+      holdDays: "7",
+      collectedDeposit: String(collected),
+      note: "",
+    });
+    setCancelDepositContract(c);
+  }
+
+  async function handleConfirmCancelDeposit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!cancelDepositContract) return;
+    const dep = cancelDepositContract.deposits[0];
+    if (!dep) return;
+    await fetch("/api/sales/contracts", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        depositId: dep.id,
+        action: "CANCEL_DEPOSIT",
+        holdDays: Number(cancelDepositForm.holdDays || 0),
+        collectedDeposit: Number(cancelDepositForm.collectedDeposit || 0),
+        note: cancelDepositForm.note,
+      }),
+    });
+    setCancelDepositContract(null);
+    setSelectedContract(null);
+    loadData();
+  }
+
+  async function handleDepositAction(depositId: string, action: "COLLECT_DEPOSIT" | "PAY_LANDLORD" | "SIGN_AND_RENT") {
     await fetch("/api/sales/contracts", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ depositId, action }),
     });
+    setSelectedContract(null);
     loadData();
   }
 
-  // Leaderboard aggregation
+  // Leaderboard aggregation (hiển thị đầy đủ doanh số toàn phòng Sales)
   const leaderboard = crm.salesUsers
     .map((su) => {
-      const myContracts = contracts.filter((c) => c.sales.id === su.id);
-      const rev = myContracts.reduce((s, c) => s + c.companyRevenue, 0);
+      const stat = salesStats[su.id];
+      const myContracts = contracts.filter(
+        (c) => c.sales.id === su.id && (c.status === "ACTIVE" || c.status === "FORFEITED")
+      );
+      const contractCount = stat ? stat.contractCount : myContracts.length;
+      const rev = stat ? stat.revenue : myContracts.reduce((s, c) => s + c.companyRevenue, 0);
       const comm = calculateSalesCommission(rev);
+      const target = su.kpiTarget > 0 ? su.kpiTarget : 15_000_000;
       return {
         ...su,
-        contractCount: myContracts.length,
+        contractCount,
         revenue: rev,
         commission: comm.commissionAmount,
         totalIncome: comm.grossIncome,
         rate: comm.rate,
-        kpiPercent: su.kpiTarget > 0 ? Math.min(100, Math.round((rev / su.kpiTarget) * 100)) : 0,
+        kpiPercent: Math.min(100, Math.round((rev / target) * 100)),
       };
     })
     .sort((a, b) => b.revenue - a.revenue);
@@ -425,16 +806,32 @@ export default function SalesPage() {
                     <th className="px-4 py-3 text-right">Tiền cọc</th>
                     <th className="px-4 py-3 text-right">Doanh thu CTY</th>
                     <th className="px-4 py-3 text-right">Trả chủ trọ</th>
-                    <th className="px-4 py-3">Thu cọc / Trả chủ trọ</th>
+                    <th className="px-4 py-3">Thu cọc / Trạng thái</th>
+                    <th className="px-4 py-3 text-right">Chi tiết</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
                   {contracts.map((c) => {
                     const dep = c.deposits[0];
+                    const isReserved = c.status === "RESERVED";
+                    const isForfeited = c.status === "FORFEITED";
                     return (
                       <tr key={c.id} className="hover:bg-neutral-50">
                         <td className="px-4 py-3">
-                          <div className="font-mono text-xs font-semibold text-amber-700">{c.contractCode}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-xs font-semibold text-amber-700">{c.contractCode}</span>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                isForfeited
+                                  ? "bg-rose-100 text-rose-700"
+                                  : isReserved
+                                    ? "bg-amber-100 text-amber-800"
+                                    : "bg-emerald-100 text-emerald-700"
+                              }`}
+                            >
+                              {isForfeited ? "Hủy cọc" : isReserved ? "Đã đặt cọc" : "Đã thuê / Ký HĐ"}
+                            </span>
+                          </div>
                           <div className="text-xs text-neutral-400">
                             {formatDate(c.signedDate)} • {c.durationMonths}T ({(c.companyCommissionRate * 100).toFixed(0)}%)
                           </div>
@@ -456,16 +853,35 @@ export default function SalesPage() {
                         <td className="px-4 py-3 space-y-1">
                           {dep && (
                             <div className="flex flex-wrap gap-1.5">
-                              {dep.collectionStatus === "COLLECTED" ? (
+                              {isForfeited ? (
+                                <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-700 text-[11px] font-medium">
+                                  Đã hủy cọc &amp; chia 50/50
+                                </span>
+                              ) : isReserved ? (
+                                <>
+                                  <button
+                                    onClick={() => openSignRentModal(c)}
+                                    className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold cursor-pointer"
+                                  >
+                                    Thanh toán đủ &amp; Ký HĐ
+                                  </button>
+                                  <button
+                                    onClick={() => openCancelDepositModal(c)}
+                                    className="px-2 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-semibold cursor-pointer"
+                                  >
+                                    Hủy cọc
+                                  </button>
+                                </>
+                              ) : dep.collectionStatus === "COLLECTED" ? (
                                 <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[11px] font-medium">
-                                  Đã thu đủ cọc
+                                  Đã thu đủ &amp; Ký HĐ
                                 </span>
                               ) : (
                                 <button
-                                  onClick={() => handleDepositAction(dep.id, "COLLECT_DEPOSIT")}
+                                  onClick={() => openSignRentModal(c)}
                                   className="px-2 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 text-[11px] font-medium cursor-pointer"
                                 >
-                                  Xác nhận thu cọc
+                                  Thanh toán đủ &amp; Ký HĐ
                                 </button>
                               )}
                               {dep.landlordPayoutStatus === "PAID" ? (
@@ -483,6 +899,15 @@ export default function SalesPage() {
                             </div>
                           )}
                         </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedContract(c)}
+                            className="px-2.5 py-1 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-xs font-medium cursor-pointer"
+                          >
+                            Xem chi tiết
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -492,7 +917,9 @@ export default function SalesPage() {
           </div>
         )}
 
-        {tab === "LEADERBOARD" && (
+        {tab === "LEADERBOARD" && (() => {
+          const canViewCommissionPayroll = currentUserRole === "ADMIN" || currentUserRole === "ACCOUNTANT";
+          return (
           <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
             <table className="w-full text-sm text-left">
               <thead className="bg-neutral-50 text-neutral-600 text-xs uppercase border-b border-neutral-200">
@@ -501,8 +928,8 @@ export default function SalesPage() {
                   <th className="px-4 py-3">Nhân viên Sales</th>
                   <th className="px-4 py-3 text-center">Số HĐ</th>
                   <th className="px-4 py-3 text-right">Doanh số CTY</th>
-                  <th className="px-4 py-3 text-center">Mức hoa hồng</th>
-                  <th className="px-4 py-3 text-right">Thu nhập dự kiến</th>
+                  {canViewCommissionPayroll && <th className="px-4 py-3 text-center">Mức hoa hồng</th>}
+                  {canViewCommissionPayroll && <th className="px-4 py-3 text-right">Thu nhập dự kiến</th>}
                   <th className="px-4 py-3">KPI</th>
                 </tr>
               </thead>
@@ -513,14 +940,18 @@ export default function SalesPage() {
                     <td className="px-4 py-3 font-medium text-neutral-900">{s.fullName}</td>
                     <td className="px-4 py-3 text-center">{s.contractCount}</td>
                     <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatVND(s.revenue)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold">
-                        {(s.rate * 100).toFixed(0)}%
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-bold text-emerald-600 tabular-nums">
-                      {formatVND(s.totalIncome)}
-                    </td>
+                    {canViewCommissionPayroll && (
+                      <td className="px-4 py-3 text-center">
+                        <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold">
+                          {(s.rate * 100).toFixed(0)}%
+                        </span>
+                      </td>
+                    )}
+                    {canViewCommissionPayroll && (
+                      <td className="px-4 py-3 text-right font-bold text-emerald-600 tabular-nums">
+                        {formatVND(s.totalIncome)}
+                      </td>
+                    )}
                     <td className="px-4 py-3 w-40">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-2 bg-neutral-100 rounded-full overflow-hidden">
@@ -543,58 +974,491 @@ export default function SalesPage() {
                   <td className="px-4 py-3 text-right tabular-nums text-amber-400">
                     {formatVND(leaderboard.reduce((s, x) => s + x.revenue, 0))}
                   </td>
-                  <td className="px-4 py-3 text-center text-xs text-neutral-400">—</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-emerald-400">
-                    {formatVND(leaderboard.reduce((s, x) => s + x.totalIncome, 0))}
-                  </td>
+                  {canViewCommissionPayroll && (
+                    <td className="px-4 py-3 text-center text-xs text-neutral-400">—</td>
+                  )}
+                  {canViewCommissionPayroll && (
+                    <td className="px-4 py-3 text-right tabular-nums text-emerald-400">
+                      {formatVND(leaderboard.reduce((s, x) => s + x.totalIncome, 0))}
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-xs text-neutral-400">
-                    CTY giữ lại:{" "}
-                    <span className="text-white">
-                      {formatVND(
-                        leaderboard.reduce((s, x) => s + x.revenue, 0) -
-                          leaderboard.reduce((s, x) => s + x.totalIncome, 0)
-                      )}
-                    </span>
+                    {canViewCommissionPayroll ? (
+                      <>
+                        CTY giữ lại:{" "}
+                        <span className="text-white">
+                          {formatVND(
+                            leaderboard.reduce((s, x) => s + x.revenue, 0) -
+                              leaderboard.reduce((s, x) => s + x.totalIncome, 0)
+                          )}
+                        </span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                 </tr>
               </tfoot>
             </table>
           </div>
-        )}
+          );
+        })()}
 
         {tab === "ROOMS" && (
           <div className="space-y-4">
-            <div className="flex justify-end">
-              <button
-                onClick={() => setShowRoomModal(true)}
-                className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" /> Thêm Phòng trọ
-              </button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {crm.rooms.map((r) => {
-                const activeContract =
-                  r.status === "RENTED" || r.status === "RESERVED" ? r.contracts?.[0] : undefined;
-                return (
-                  <div
-                    key={r.id}
-                    onClick={() => {
-                      setSelectedRoom(r);
-                      setEditingRoom(false);
-                      setRoomError("");
-                      setEditRoomForm({
-                        roomNumber: r.roomNumber,
-                        floor: String(r.floor),
-                        area: String(r.area),
-                        price: String(r.price),
-                        amenities: r.amenities || "",
-                        status: r.status,
-                      });
-                    }}
-                    className="bg-white rounded-xl border border-neutral-200 overflow-hidden flex flex-col cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-amber-400"
-                  >
-                    <div className="relative h-40 bg-neutral-100 flex items-center justify-center">
+            {(() => {
+              const uniqueDistricts = Array.from(
+                new Set([
+                  ...crm.properties.map((p) => p.district).filter(Boolean),
+                  ...crm.rooms.map((r) => r.property.district).filter(Boolean),
+                ])
+              ).sort();
+              const districtProperties =
+                roomDistrict === "ALL"
+                  ? crm.properties
+                  : crm.properties.filter((p) => p.district === roomDistrict);
+              const hasActiveFilter =
+                roomSearch.trim() !== "" ||
+                roomDistrict !== "ALL" ||
+                roomPropertyFilter !== "ALL" ||
+                roomPriceRange !== "ALL" ||
+                roomTypeFilter !== "ALL" ||
+                roomStatusFilter !== "ALL";
+              const filteredRooms = crm.rooms.filter((r) => {
+                if (roomDistrict !== "ALL" && r.property.district !== roomDistrict) return false;
+                if (roomPropertyFilter !== "ALL" && r.property.id !== roomPropertyFilter) return false;
+                if (roomStatusFilter !== "ALL" && r.status !== roomStatusFilter) return false;
+                const rType = r.roomType || "PHONG_TRO";
+                if (roomTypeFilter !== "ALL" && rType !== roomTypeFilter) return false;
+                if (roomPriceRange === "UNDER_3M" && r.price >= 3_000_000) return false;
+                if (roomPriceRange === "3M_5M" && (r.price < 3_000_000 || r.price > 5_000_000)) return false;
+                if (roomPriceRange === "5M_8M" && (r.price <= 5_000_000 || r.price > 8_000_000)) return false;
+                if (roomPriceRange === "OVER_8M" && r.price <= 8_000_000) return false;
+                if (roomSearch.trim()) {
+                  const q = roomSearch.toLowerCase();
+                  const hay = [
+                    r.roomNumber,
+                    r.property.name,
+                    r.property.address || "",
+                    r.property.district,
+                    r.amenities || "",
+                  ]
+                    .join(" ")
+                    .toLowerCase();
+                  if (!hay.includes(q)) return false;
+                }
+                return true;
+              });
+
+              return (
+                <>
+                  <div className="bg-white rounded-xl border border-neutral-200 p-3.5 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-xs text-neutral-600 font-medium">
+                        Hiển thị <strong className="text-neutral-950">{filteredRooms.length}</strong> / {crm.rooms.length} phòng
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {hasActiveFilter && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRoomSearch("");
+                              setRoomDistrict("ALL");
+                              setRoomPropertyFilter("ALL");
+                              setRoomPriceRange("ALL");
+                              setRoomTypeFilter("ALL");
+                              setRoomStatusFilter("ALL");
+                            }}
+                            className="px-3 py-1.5 rounded-lg border border-neutral-300 hover:bg-neutral-50 text-xs text-neutral-700 cursor-pointer"
+                          >
+                            Xóa bộ lọc
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingPropertyId(null);
+                            setPropertyForm({
+                              name: "",
+                              district: roomDistrict !== "ALL" ? roomDistrict : "Bình Thạnh",
+                              address: "",
+                              landlordName: "",
+                              landlordPhone: "",
+                            });
+                            setShowPropertyModal(true);
+                          }}
+                          className="px-3.5 py-2 rounded-lg bg-white hover:bg-amber-50 text-neutral-900 border border-amber-400 font-semibold text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Building className="w-4 h-4 text-amber-600" /> + Thêm Khu vực
+                        </button>
+                        {roomPropertyFilter !== "ALL" && (() => {
+                          const selectedProp = crm.properties.find((p) => p.id === roomPropertyFilter);
+                          if (!selectedProp) return null;
+                          return (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingPropertyId(selectedProp.id);
+                                  setPropertyForm({
+                                    name: selectedProp.name,
+                                    district: selectedProp.district,
+                                    address: selectedProp.address || "",
+                                    landlordName: selectedProp.landlordName || "",
+                                    landlordPhone: selectedProp.landlordPhone || "",
+                                  });
+                                  setShowPropertyModal(true);
+                                }}
+                                className="px-3 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
+                                title="Sửa tên quận / khu vực đang chọn"
+                              >
+                                <Pencil className="w-3.5 h-3.5" /> Sửa khu vực
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteProperty(selectedProp.id, selectedProp.name)}
+                                className="px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
+                                title="Xóa khu vực đang chọn"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> Xóa khu vực
+                              </button>
+                            </>
+                          );
+                        })()}
+                        <button
+                          onClick={() => setShowRoomModal(true)}
+                          className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" /> Thêm Phòng / Nhà
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 top-2.5" />
+                        <input
+                          value={roomSearch}
+                          onChange={(e) => setRoomSearch(e.target.value)}
+                          placeholder="Tìm phòng, địa chỉ, tiện ích..."
+                          className="w-full pl-8 pr-2.5 py-2 border border-neutral-300 rounded-lg text-xs bg-white"
+                        />
+                      </div>
+                      <select
+                        value={roomDistrict}
+                        onChange={(e) => {
+                          setRoomDistrict(e.target.value);
+                          setRoomPropertyFilter("ALL");
+                        }}
+                        className="border border-neutral-300 rounded-lg px-2.5 py-2 text-xs bg-white font-medium"
+                      >
+                        <option value="ALL">Tất cả Quận ({uniqueDistricts.length})</option>
+                        {uniqueDistricts.map((d) => {
+                          const zoneCount = crm.properties.filter((p) => p.district === d).length;
+                          return (
+                            <option key={d} value={d}>
+                              {d} ({zoneCount} khu vực)
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <select
+                        value={roomPropertyFilter}
+                        onChange={(e) => setRoomPropertyFilter(e.target.value)}
+                        className="border border-amber-400 rounded-lg px-2.5 py-2 text-xs bg-amber-50/40 font-medium"
+                      >
+                        <option value="ALL">
+                          {roomDistrict === "ALL"
+                            ? `Tất cả địa điểm (${districtProperties.length})`
+                            : `Tất cả địa điểm tại ${roomDistrict} (${districtProperties.length})`}
+                        </option>
+                        {districtProperties.map((p) => {
+                          const zoneRoomCount = crm.rooms.filter((r) => r.property.id === p.id).length;
+                          return (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({zoneRoomCount} phòng)
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <select
+                        value={roomPriceRange}
+                        onChange={(e) => setRoomPriceRange(e.target.value)}
+                        className="border border-neutral-300 rounded-lg px-2.5 py-2 text-xs bg-white"
+                      >
+                        <option value="ALL">Tất cả mức giá</option>
+                        <option value="UNDER_3M">Dưới 3 triệu</option>
+                        <option value="3M_5M">3 triệu – 5 triệu</option>
+                        <option value="5M_8M">5 triệu – 8 triệu</option>
+                        <option value="OVER_8M">Trên 8 triệu</option>
+                      </select>
+                      <select
+                        value={roomTypeFilter}
+                        onChange={(e) => setRoomTypeFilter(e.target.value)}
+                        className="border border-neutral-300 rounded-lg px-2.5 py-2 text-xs bg-white"
+                      >
+                        <option value="ALL">Tất cả loại hình</option>
+                        {Object.entries(ROOM_TYPE_LABELS).map(([k, label]) => (
+                          <option key={k} value={k}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                      <RoomStatusFilterSelect
+                        value={roomStatusFilter}
+                        onChange={setRoomStatusFilter}
+                      />
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const activeViewings = (crm.viewings || []).filter(
+                      (v) => v.status !== "CANCELLED" && v.status !== "CONTRACTED"
+                    );
+                    if (activeViewings.length === 0) return null;
+                    return (
+                    <div className="bg-white rounded-xl border border-amber-200 p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold text-sm text-neutral-900 flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-amber-600" />
+                          Lịch hẹn xem phòng ({activeViewings.length})
+                        </div>
+                        <span className="text-xs text-neutral-500">Khách xem phòng ưng ý → bấm Chốt cọc để lập phiếu &amp; tải hóa đơn PDF</span>
+                      </div>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {activeViewings
+                          .slice(0, 6)
+                          .map((v) => {
+                            const matchedRoom = crm.rooms.find((r) => r.id === v.roomId);
+                            const thumb = v.roomImage || matchedRoom?.imageUrl;
+                            const isSelf = !v.hybridMode || v.hybridMode === "SELF_100";
+                            const reminderText =
+                              v.reminderMinutes === 15
+                                ? "Trước 15 phút"
+                                : v.reminderMinutes === 60
+                                ? "Trước 1 tiếng"
+                                : v.reminderMinutes === 1440
+                                ? "Trước 1 ngày"
+                                : "Trước 30 phút";
+                            return (
+                              <div key={v.id} className="p-4 rounded-2xl border border-amber-200 bg-white shadow-sm space-y-3">
+                                {/* Top badges */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="px-2.5 py-0.5 rounded-md bg-neutral-950 text-white text-[11px] font-mono font-bold">
+                                    {v.code}
+                                  </span>
+                                  <span
+                                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
+                                      v.status === "CONTRACTED"
+                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                        : v.status === "VIEWED"
+                                        ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                                        : "bg-amber-50 text-amber-800 border-amber-200"
+                                    }`}
+                                  >
+                                    •{" "}
+                                    {v.status === "CONTRACTED"
+                                      ? "Đã chốt cọc / Ký HĐ"
+                                      : v.status === "VIEWED"
+                                      ? "Đã dẫn xem"
+                                      : "Chờ dẫn xem"}
+                                  </span>
+                                  <span className="px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 text-[11px] font-medium">
+                                    {isSelf ? "Trọn gói (100% HH)" : "Phối hợp (50% Online / 50% Offline)"}
+                                  </span>
+                                </div>
+
+                                {/* Customer & Room thumbnail */}
+                                <div className="flex items-start gap-3">
+                                  {thumb ? (
+                                    <img
+                                      src={thumb}
+                                      alt={v.roomLabel}
+                                      className="w-20 h-16 rounded-xl object-cover border border-neutral-200 shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="w-20 h-16 rounded-xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-400 shrink-0">
+                                      <ImageIcon className="w-6 h-6" />
+                                    </div>
+                                  )}
+                                  <div className="space-y-1 min-w-0">
+                                    <div className="font-bold text-base text-neutral-950">{v.customerName}</div>
+                                    <div className="text-xs text-emerald-700 flex items-center gap-1 font-medium">
+                                      <Phone className="w-3.5 h-3.5" /> {v.customerPhone}
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                      <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-semibold">
+                                        {v.roomNumber ? `Phòng ${v.roomNumber}` : v.roomLabel}
+                                      </span>
+                                      <span className="px-2 py-0.5 rounded bg-neutral-100 text-neutral-700 border border-neutral-200">
+                                        {v.district}
+                                      </span>
+                                      <strong className="text-emerald-700">{formatVND(v.price)}</strong>
+                                    </div>
+                                    <div className="text-[11px] text-neutral-500">
+                                      {v.propertyName || v.roomLabel}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Info bar */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-xl bg-neutral-50 border border-neutral-200/80 text-xs">
+                                  <div className="flex items-start gap-2">
+                                    <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                    <div>
+                                      <div className="text-[11px] text-neutral-500">
+                                        Giờ hẹn xem phòng • {reminderText}
+                                      </div>
+                                      <div className="font-bold text-neutral-900">
+                                        {new Date(v.viewingAt).toLocaleString("vi-VN", {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                          day: "2-digit",
+                                          month: "2-digit",
+                                          year: "numeric",
+                                        })}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-start gap-2">
+                                    <User className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+                                    <div>
+                                      {isSelf ? (
+                                        <>
+                                          <div className="text-[11px] text-neutral-500">Trọn gói (100% HH)</div>
+                                          <div className="font-bold text-neutral-900">{v.salesName}</div>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <div className="text-[11px] text-neutral-500">
+                                            Online (50%): {v.onlineSalesName || "Sales Online"}
+                                          </div>
+                                          <div className="font-bold text-indigo-700">
+                                            Offline (50%): {v.salesName}
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Bottom actions */}
+                                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-100">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <a
+                                      href={`tel:${v.customerPhone}`}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100 text-emerald-700 text-xs font-medium"
+                                    >
+                                      <Phone className="w-3.5 h-3.5" /> Gọi
+                                    </a>
+                                    <a
+                                      href={`https://zalo.me/${v.customerPhone.replace(/\D/g, "")}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-sky-200 bg-sky-50/60 hover:bg-sky-100 text-sky-700 text-xs font-medium"
+                                    >
+                                      <MessageCircle className="w-3.5 h-3.5" /> Zalo
+                                    </a>
+                                    {v.status === "SCHEDULED" && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateViewingStatus(v.id, "VIEWED")}
+                                        className="px-2.5 py-1 rounded-lg border border-neutral-300 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium cursor-pointer"
+                                      >
+                                        Đã dẫn xem
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {v.status !== "CONTRACTED" ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const moveIn = new Date();
+                                        moveIn.setDate(moveIn.getDate() + 3);
+                                        const matchedCustomer = crm.customers.find((cust) => cust.id === v.customerId);
+                                        setDepositForm({
+                                          depositAmount: String(v.price),
+                                          durationMonths: "12",
+                                          moveInDate: moveIn.toISOString().slice(0, 10),
+                                          note: v.note || "",
+                                          customerIdCard: matchedCustomer?.idCard || "",
+                                          paymentMethod: "TRANSFER",
+                                          transferAmount: String(v.price),
+                                          cashAmount: "",
+                                          evidenceUrl: "",
+                                        });
+                                        setDepositModalViewing(v);
+                                      }}
+                                      className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                                    >
+                                      <Sparkles className="w-3.5 h-3.5" /> Chốt cọc
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setReceiptModalData({
+                                          contractCode: v.code,
+                                          customerName: v.customerName,
+                                          customerPhone: v.customerPhone,
+                                          roomLabel: v.roomLabel,
+                                          address: [v.address, v.district].filter(Boolean).join(", "),
+                                          monthlyRent: v.price,
+                                          depositAmount: v.price,
+                                          collectedAmount: v.price,
+                                          durationMonths: 12,
+                                          moveInDate: v.viewingAt,
+                                          salesName: v.salesName,
+                                          note: v.note,
+                                        })
+                                      }
+                                      className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <Printer className="w-3.5 h-3.5" /> Tải hóa đơn PDF
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                    );
+                  })()}
+
+                  {filteredRooms.length === 0 ? (
+                    <div className="bg-white rounded-xl border border-neutral-200 p-10 text-center text-sm text-neutral-500">
+                      Không tìm thấy phòng phù hợp với tiêu chí lọc hiện tại.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {filteredRooms.map((r) => {
+                        const activeContract =
+                          r.status === "RENTED" || r.status === "RESERVED" ? r.contracts?.[0] : undefined;
+                        return (
+                          <div
+                            key={r.id}
+                            onClick={() => {
+                              setSelectedRoom(r);
+                              setEditingRoom(false);
+                              setRoomError("");
+                              setEditRoomForm({
+                                roomNumber: r.roomNumber,
+                                roomType: r.roomType || "PHONG_TRO",
+                                floor: String(r.floor),
+                                area: String(r.area),
+                                price: String(r.price),
+                                amenities: r.amenities || "",
+                                status: r.status,
+                              });
+                            }}
+                            className="bg-white rounded-xl border border-neutral-200 overflow-hidden flex flex-col cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-amber-400"
+                          >
+                            <div className="relative h-40 bg-neutral-100 flex items-center justify-center">
+                              <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-white/90 text-neutral-800 border border-neutral-200 text-[11px] font-medium">
+                                {ROOM_TYPE_LABELS[r.roomType || "PHONG_TRO"] || "Phòng trọ"}
+                              </span>
                       {r.imageUrl ? (
                         <img src={r.imageUrl} alt={`${r.property.name} ${r.roomNumber}`} className="w-full h-full object-cover" />
                       ) : (
@@ -647,13 +1511,30 @@ export default function SalesPage() {
                       </div>
                       <div className="flex items-center justify-between mt-3 pt-2 border-t border-neutral-100">
                         <div className="text-sm font-bold text-amber-600">{formatVND(r.price)}/tháng</div>
-                        <span className="text-[11px] font-medium text-neutral-500">Bấm xem chi tiết →</span>
+                        {r.status === "AVAILABLE" ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openViewingModalForRoom(r.id);
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[11px] font-semibold cursor-pointer"
+                          >
+                            <CalendarPlus className="w-3 h-3" /> Đặt lịch xem
+                          </button>
+                        ) : (
+                          <span className="text-[11px] font-medium text-neutral-500">Bấm xem chi tiết →</span>
+                        )}
                       </div>
                     </div>
                   </div>
                 );
               })}
-            </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 
@@ -675,7 +1556,7 @@ export default function SalesPage() {
                   <tr key={c.id}>
                     <td className="px-4 py-3 font-medium text-neutral-900">{c.fullName}</td>
                     <td className="px-4 py-3 text-neutral-600">{c.phone}</td>
-                    <td className="px-4 py-3 text-xs">{c.source}</td>
+                    <td className="px-4 py-3 text-xs">{SOURCE_LABELS[c.source] || c.source}</td>
                     <td className="px-4 py-3 text-xs">{c.sales?.fullName}</td>
                     <td className="px-4 py-3">
                       <span
@@ -849,23 +1730,80 @@ export default function SalesPage() {
         )}
 
         {showRoomModal && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4">
-              <h3 className="text-lg font-bold text-neutral-900">Thêm Phòng trọ mới</h3>
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 my-6 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-neutral-900">Thêm Phòng trọ mới</h3>
+                <button type="button" onClick={() => setShowRoomModal(false)} className="p-1 rounded-lg hover:bg-neutral-100 cursor-pointer">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
               <form onSubmit={handleCreateRoom} className="space-y-3">
                 <div>
                   <label className="block text-xs font-medium mb-1">Tòa nhà / Khu trọ</label>
                   <select
                     value={roomForm.propertyId}
-                    onChange={(e) => setRoomForm({ ...roomForm, propertyId: e.target.value })}
-                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const prop = crm.properties.find((p) => p.id === val);
+                      setRoomForm({
+                        ...roomForm,
+                        propertyId: val,
+                        district: val === "__NEW__" ? "" : prop?.district || "",
+                        address: val === "__NEW__" ? "" : prop?.address || "",
+                      });
+                    }}
+                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-white"
                   >
                     {crm.properties.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} ({p.district})
                       </option>
                     ))}
+                    <option value="__NEW__">+ Nhập tòa nhà / khu vực mới</option>
                   </select>
+                </div>
+                {roomForm.propertyId === "__NEW__" && (
+                  <input
+                    required
+                    placeholder="Tên tòa nhà / Khu trọ mới (VD: NDAHome Quận 7)"
+                    value={roomForm.propertyName}
+                    onChange={(e) => setRoomForm({ ...roomForm, propertyName: e.target.value })}
+                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <input
+                      required
+                      list="hcm-districts"
+                      placeholder="Quận / Khu vực (VD: Bình Thạnh, Quận 7...)"
+                      value={roomForm.district}
+                      onChange={(e) => setRoomForm({ ...roomForm, district: e.target.value })}
+                      className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                    />
+                    <datalist id="hcm-districts">
+                      <option value="Quận 1" />
+                      <option value="Quận 3" />
+                      <option value="Quận 4" />
+                      <option value="Quận 5" />
+                      <option value="Quận 7" />
+                      <option value="Quận 10" />
+                      <option value="Bình Thạnh" />
+                      <option value="Phú Nhuận" />
+                      <option value="Gò Vấp" />
+                      <option value="Tân Bình" />
+                      <option value="Tân Phú" />
+                      <option value="TP. Thủ Đức" />
+                      <option value="Bình Tân" />
+                    </datalist>
+                  </div>
+                  <input
+                    placeholder="Địa chỉ (số nhà, đường...)"
+                    value={roomForm.address}
+                    onChange={(e) => setRoomForm({ ...roomForm, address: e.target.value })}
+                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                  />
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <input
@@ -890,20 +1828,63 @@ export default function SalesPage() {
                     className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
                   />
                 </div>
-                <input
-                  type="number"
-                  required
-                  placeholder="Giá thuê / tháng (VNĐ)"
-                  value={roomForm.price}
-                  onChange={(e) => setRoomForm({ ...roomForm, price: e.target.value })}
-                  className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
-                />
-                <input
-                  placeholder="Tiện ích (Máy lạnh, tủ lạnh...)"
-                  value={roomForm.amenities}
-                  onChange={(e) => setRoomForm({ ...roomForm, amenities: e.target.value })}
-                  className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={roomForm.roomType}
+                    onChange={(e) => setRoomForm({ ...roomForm, roomType: e.target.value })}
+                    className="border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-white"
+                  >
+                    {Object.entries(ROOM_TYPE_LABELS).map(([k, label]) => (
+                      <option key={k} value={k}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    required
+                    placeholder="Giá thuê / tháng (VNĐ)"
+                    value={roomForm.price}
+                    onChange={(e) => setRoomForm({ ...roomForm, price: e.target.value })}
+                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-800">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Tiện ích nổi bật của phòng
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ROOM_AMENITY_OPTIONS.map((item) => {
+                      const active = hasAmenityValue(roomForm.amenities, item);
+                      return (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() =>
+                            setRoomForm({
+                              ...roomForm,
+                              amenities: toggleAmenityValue(roomForm.amenities, item),
+                            })
+                          }
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+                            active
+                              ? "border-amber-500 bg-amber-50 text-amber-800"
+                              : "border-neutral-200 bg-white text-neutral-700 hover:border-amber-300"
+                          }`}
+                        >
+                          {active && <CheckCircle2 className="w-3 h-3 text-amber-600" />}
+                          {item}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <input
+                    placeholder="Tiện ích khác (hoặc xem danh sách đã chọn)..."
+                    value={roomForm.amenities}
+                    onChange={(e) => setRoomForm({ ...roomForm, amenities: e.target.value })}
+                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-xs"
+                  />
+                </div>
                 <div className="flex items-center gap-3">
                   <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-950 text-amber-400 text-xs font-medium cursor-pointer">
                     <Upload className="w-3.5 h-3.5" />
@@ -974,9 +1955,24 @@ export default function SalesPage() {
                         : "Đặt cọc"}
                     </span>
                   </div>
-                  <div className="text-xs text-neutral-500 mt-1">
-                    {selectedRoom.property.address ? `${selectedRoom.property.address}, ` : ""}
-                    {selectedRoom.property.district} • Tầng {selectedRoom.floor} • {selectedRoom.area}m²
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500 mt-1">
+                    <span>
+                      {selectedRoom.property.address ? `${selectedRoom.property.address}, ` : ""}
+                      {selectedRoom.property.district} • Tầng {selectedRoom.floor} • {selectedRoom.area}m²
+                    </span>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                        [selectedRoom.property.address || selectedRoom.property.name, selectedRoom.property.district]
+                          .filter(Boolean)
+                          .join(", ")
+                      )}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 font-medium"
+                      title="Xem địa chỉ phòng trên Google Maps"
+                    >
+                      <MapPin className="w-3 h-3" /> Mở Google Maps <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -1049,7 +2045,21 @@ export default function SalesPage() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-[11px] text-neutral-600 mb-0.5">Loại hình</label>
+                      <select
+                        value={editRoomForm.roomType}
+                        onChange={(e) => setEditRoomForm({ ...editRoomForm, roomType: e.target.value })}
+                        className="w-full border border-neutral-300 rounded-lg px-2.5 py-1.5 text-xs bg-white"
+                      >
+                        {Object.entries(ROOM_TYPE_LABELS).map(([k, label]) => (
+                          <option key={k} value={k}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <div>
                       <label className="block text-[11px] text-neutral-600 mb-0.5">Giá thuê / tháng (VNĐ)</label>
                       <input
@@ -1109,6 +2119,28 @@ export default function SalesPage() {
                     <strong className="text-neutral-900">{selectedRoom.property.landlordPhone}</strong>
                   </div>
                 )}
+                <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-neutral-200">
+                  <div>
+                    <span className="text-neutral-500">Địa chỉ:</span>{" "}
+                    <strong className="text-neutral-900">
+                      {[selectedRoom.property.address || selectedRoom.property.name, selectedRoom.property.district]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </strong>
+                  </div>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      [selectedRoom.property.address || selectedRoom.property.name, selectedRoom.property.district]
+                        .filter(Boolean)
+                        .join(", ")
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-xs font-medium"
+                  >
+                    <MapPin className="w-3.5 h-3.5" /> Chỉ đường Google Maps <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
               </div>
 
               {(selectedRoom.status === "RENTED" || selectedRoom.status === "RESERVED") && selectedRoom.contracts?.[0] ? (
@@ -1163,7 +2195,7 @@ export default function SalesPage() {
                           </div>
                           <div>
                             <span className="text-neutral-500">Nguồn khách:</span>{" "}
-                            <span className="text-neutral-800">{ct.customer.source}</span>
+                            <span className="text-neutral-800">{SOURCE_LABELS[ct.customer.source] || ct.customer.source}</span>
                           </div>
                           {ct.customer.note && (
                             <div className="sm:col-span-2">
@@ -1227,18 +2259,18 @@ export default function SalesPage() {
                         </div>
                       </div>
 
-                      {/* Ảnh hóa đơn / chứng từ minh chứng thuê phòng */}
+                      {/* File PDF hóa đơn / chứng từ minh chứng thuê phòng */}
                       <div className="p-4 rounded-xl border border-neutral-200 bg-neutral-50 space-y-3">
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 font-bold text-xs text-neutral-900">
-                            <ImageIcon className="w-4 h-4 text-amber-600" /> Ảnh hóa đơn / Chứng từ minh chứng
+                            <FileText className="w-4 h-4 text-amber-600" /> File PDF hóa đơn / Chứng từ minh chứng
                           </div>
                           <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-xs font-medium cursor-pointer">
                             <Upload className="w-3.5 h-3.5" />
-                            {uploadingInvoice ? "Đang tải..." : ct.invoiceUrl ? "Đổi ảnh hóa đơn" : "Tải ảnh hóa đơn"}
+                            {uploadingInvoice ? "Đang tải..." : ct.invoiceUrl ? "Đổi file PDF" : "Tải file PDF hóa đơn"}
                             <input
                               type="file"
-                              accept="image/*"
+                              accept=".pdf,application/pdf,image/*"
                               onChange={(e) => handleUploadContractInvoice(ct.id, e)}
                               className="hidden"
                             />
@@ -1246,24 +2278,34 @@ export default function SalesPage() {
                         </div>
                         {ct.invoiceUrl ? (
                           <div className="flex items-center gap-3">
-                            <img
-                              src={ct.invoiceUrl}
-                              alt="Hóa đơn minh chứng"
-                              onClick={() => setPreviewInvoiceUrl(ct.invoiceUrl || null)}
-                              className="w-28 h-20 object-cover rounded-lg border border-amber-400 cursor-pointer hover:opacity-90"
-                              title="Bấm để phóng to"
-                            />
+                            {isImageUrl(ct.invoiceUrl) ? (
+                              <img
+                                src={ct.invoiceUrl}
+                                alt="Hóa đơn minh chứng"
+                                onClick={() => setPreviewInvoiceUrl(ct.invoiceUrl || null)}
+                                className="w-28 h-20 object-cover rounded-lg border border-amber-400 cursor-pointer hover:opacity-90"
+                                title="Bấm để xem"
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewInvoiceUrl(ct.invoiceUrl || null)}
+                                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-semibold cursor-pointer"
+                              >
+                                <FileText className="w-4 h-4 text-rose-600" /> Tệp PDF hóa đơn đã đính kèm
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => setPreviewInvoiceUrl(ct.invoiceUrl || null)}
                               className="text-xs font-medium text-amber-700 hover:underline cursor-pointer"
                             >
-                              Bấm vào ảnh để xem phóng to →
+                              Bấm để xem / tải file PDF →
                             </button>
                           </div>
                         ) : (
                           <div className="text-xs text-neutral-500">
-                            Chưa có ảnh chụp hóa đơn / biên lai chuyển khoản cho hợp đồng này.
+                            Chưa có file PDF hóa đơn / biên lai chuyển khoản cho hợp đồng này.
                           </div>
                         )}
                       </div>
@@ -1281,23 +2323,937 @@ export default function SalesPage() {
                       ? "Phòng này hiện đang trống và chưa có hợp đồng thuê hiệu lực."
                       : "Phòng này chưa có thông tin hợp đồng / đặt cọc liên kết."}
                   </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const rid = selectedRoom.id;
+                        setSelectedRoom(null);
+                        openViewingModalForRoom(rid);
+                      }}
+                      className="px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-neutral-950 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <CalendarPlus className="w-3.5 h-3.5" /> Đặt lịch xem phòng
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm((f) => ({
+                          ...f,
+                          roomId: selectedRoom.id,
+                          monthlyRent: String(selectedRoom.price),
+                        }));
+                        setSelectedRoom(null);
+                        setShowContractModal(true);
+                      }}
+                      className="px-3.5 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-xs font-bold cursor-pointer"
+                    >
+                      + Tạo hợp đồng / đặt cọc
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Modal Đặt lịch xem phòng (Sales Hybrid) */}
+        {showViewingModal && (() => {
+          const selectedProp = crm.properties.find((p) => p.id === viewingForm.propertyId);
+          const propRooms = selectedProp
+            ? crm.rooms.filter(
+                (r) => r.property.name === selectedProp.name && r.property.district === selectedProp.district
+              )
+            : crm.rooms;
+          const previewRoom = crm.rooms.find((r) => r.id === viewingForm.roomId) || propRooms[0];
+          const isSelf100 = viewingForm.hybridMode === "SELF_100";
+
+          return (
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 overflow-y-auto">
+              <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl my-6 max-h-[92vh] overflow-y-auto">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shrink-0">
+                      <CalendarPlus className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-neutral-900">
+                        Đặt lịch hẹn xem phòng (Sales Hybrid)
+                      </h3>
+                      <p className="text-xs text-neutral-500">
+                        Linh hoạt tự dẫn hưởng 100% HH hoặc chuyển đồng đội / Kho lịch chờ nhận (50% / 50%)
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowViewingModal(false)}
+                    className="p-1 hover:bg-neutral-100 rounded-lg cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateViewing} className="space-y-4">
+                  {/* 1. Thông tin khách hàng */}
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <label className="text-xs font-bold text-neutral-900">1. Thông tin khách hàng *</label>
+                      <div className="inline-flex rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => setViewingForm((vf) => ({ ...vf, customerMode: "EXISTING" }))}
+                          className={`px-2.5 py-1 rounded-md font-medium cursor-pointer ${
+                            viewingForm.customerMode === "EXISTING"
+                              ? "bg-white text-amber-700 shadow-sm border border-amber-300"
+                              : "text-neutral-600"
+                          }`}
+                        >
+                          Chọn khách có sẵn
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setViewingForm((vf) => ({ ...vf, customerMode: "NEW" }))}
+                          className={`px-2.5 py-1 rounded-md font-medium cursor-pointer ${
+                            viewingForm.customerMode === "NEW"
+                              ? "bg-amber-50 text-amber-800 shadow-sm border border-amber-300"
+                              : "text-neutral-600"
+                          }`}
+                        >
+                          + Nhập nhanh khách mới
+                        </button>
+                      </div>
+                    </div>
+
+                    {viewingForm.customerMode === "NEW" ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input
+                          required
+                          placeholder="Họ và tên khách hàng *"
+                          value={viewingForm.customerName}
+                          onChange={(e) => setViewingForm({ ...viewingForm, customerName: e.target.value })}
+                          className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                        />
+                        <input
+                          required
+                          placeholder="Số điện thoại *"
+                          value={viewingForm.customerPhone}
+                          onChange={(e) => setViewingForm({ ...viewingForm, customerPhone: e.target.value })}
+                          className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                        />
+                      </div>
+                    ) : (
+                      <select
+                        required
+                        value={viewingForm.customerId}
+                        onChange={(e) => setViewingForm({ ...viewingForm, customerId: e.target.value })}
+                        className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-white"
+                      >
+                        {crm.customers.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.fullName} ({c.phone})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* 2. Khu trọ & Phòng khách muốn xem */}
+                  <div className="p-3.5 rounded-xl border border-neutral-200 bg-neutral-50/70 space-y-3">
+                    <div className="text-xs font-bold text-neutral-900">2. Khu trọ &amp; Phòng khách muốn xem *</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] text-neutral-600 mb-1">Chọn Khu trọ / Tòa nhà</label>
+                        <select
+                          value={viewingForm.propertyId}
+                          onChange={(e) => {
+                            const pid = e.target.value;
+                            const p = crm.properties.find((x) => x.id === pid);
+                            const matchingRooms = p
+                              ? crm.rooms.filter(
+                                  (r) => r.property.name === p.name && r.property.district === p.district
+                                )
+                              : crm.rooms;
+                            const firstAvail =
+                              matchingRooms.find((r) => r.status === "AVAILABLE") || matchingRooms[0];
+                            setViewingForm({
+                              ...viewingForm,
+                              propertyId: pid,
+                              roomId: firstAvail?.id || "",
+                            });
+                          }}
+                          className="w-full border border-neutral-300 rounded-lg px-2.5 py-2 text-xs bg-white"
+                        >
+                          {crm.properties.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({p.district})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-neutral-600 mb-1">Chọn Phòng cụ thể</label>
+                        <select
+                          required
+                          value={viewingForm.roomId}
+                          onChange={(e) => setViewingForm({ ...viewingForm, roomId: e.target.value })}
+                          className="w-full border border-neutral-300 rounded-lg px-2.5 py-2 text-xs bg-white"
+                        >
+                          {propRooms.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.roomNumber} ({r.status === "AVAILABLE" ? "Trống" : getStatusLabel(r.status)}) —{" "}
+                              {formatVND(r.price)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {previewRoom && (
+                      <div className="p-2.5 rounded-xl bg-amber-50/50 border border-amber-200 flex items-center gap-3">
+                        {previewRoom.imageUrl ? (
+                          <img
+                            src={previewRoom.imageUrl}
+                            alt={previewRoom.roomNumber}
+                            className="w-16 h-14 rounded-lg object-cover border border-amber-300 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-16 h-14 rounded-lg bg-neutral-200 flex items-center justify-center text-neutral-400 shrink-0">
+                            <ImageIcon className="w-5 h-5" />
+                          </div>
+                        )}
+                        <div className="text-xs space-y-0.5 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <strong className="text-neutral-900">
+                              Phòng {previewRoom.roomNumber} • Tầng {previewRoom.floor} • {previewRoom.area}m²
+                            </strong>
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-semibold">
+                              {previewRoom.status === "AVAILABLE" ? "Trống" : getStatusLabel(previewRoom.status)}
+                            </span>
+                          </div>
+                          <div className="font-bold text-amber-700">
+                            Giá thuê: {formatVND(previewRoom.price)}/tháng
+                          </div>
+                          <div className="text-[11px] text-neutral-500 truncate">
+                            {previewRoom.property.address ? `${previewRoom.property.address}, ` : ""}
+                            {previewRoom.property.district}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Ngày & giờ hẹn xem phòng */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-neutral-900">3. Ngày &amp; giờ hẹn xem phòng *</label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={viewingForm.viewingAt}
+                      onChange={(e) => setViewingForm({ ...viewingForm, viewingAt: e.target.value })}
+                      className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-white"
+                    />
+                  </div>
+
+                  {/* 4. Người dẫn khách (Sales Offline) */}
+                  <div className="p-3.5 rounded-xl border border-amber-300 bg-amber-50/40 space-y-2.5">
+                    <label className="block text-xs font-bold text-neutral-900">
+                      4. Người dẫn khách (Sales Offline) *
+                    </label>
+                    <select
+                      value={viewingForm.salesId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const mode =
+                          val === "SELF" ? "SELF_100" : val === "POOL" ? "POOL_40_60" : "TEAM_40_60";
+                        setViewingForm({ ...viewingForm, salesId: val, hybridMode: mode });
+                      }}
+                      className="w-full border border-amber-400 rounded-lg px-3 py-2 text-xs font-medium bg-white"
+                    >
+                      <option value="SELF">Chính tôi — Tự tư vấn &amp; Tự dẫn khách (Hưởng 100% HH)</option>
+                      <option value="POOL">Đưa vào Kho lịch chờ nhận (50% Online / 50% Offline)</option>
+                      {crm.salesUsers.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          Chuyển đồng đội: {s.fullName} (50% Online / 50% Offline)
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-800 font-semibold">
+                        {isSelf100 ? "Trọn gói (100% HH)" : "Phối hợp (50% Online / 50% Offline)"}
+                      </span>
+                      <span className="text-neutral-500">
+                        {isSelf100 ? "Tự động xác nhận lịch ngay" : "Gửi thông báo xác nhận lịch"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 5. Nhắc lịch tự động trước giờ hẹn */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-neutral-900">
+                      5. Nhắc lịch tự động trước giờ hẹn
+                    </label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        { label: "Trước 15 phút", mins: 15 },
+                        { label: "Trước 30 phút", mins: 30 },
+                        { label: "Trước 1 tiếng", mins: 60 },
+                        { label: "Trước 1 ngày", mins: 1440 },
+                      ].map((opt) => (
+                        <button
+                          key={opt.mins}
+                          type="button"
+                          onClick={() => setViewingForm({ ...viewingForm, reminderMinutes: opt.mins })}
+                          className={`py-2 px-2 rounded-lg text-xs font-medium border cursor-pointer ${
+                            viewingForm.reminderMinutes === opt.mins
+                              ? "border-amber-500 bg-amber-50 text-amber-800 font-semibold"
+                              : "border-neutral-200 bg-white text-neutral-700 hover:border-amber-300"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 6. Ghi chú yêu cầu của khách */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-neutral-900">6. Ghi chú yêu cầu của khách</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Ví dụ: Khách cần xem ban công, máy lạnh, hỏi bãi giữ xe..."
+                      value={viewingForm.note}
+                      onChange={(e) => setViewingForm({ ...viewingForm, note: e.target.value })}
+                      className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-xs"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100">
+                    <button
+                      type="button"
+                      onClick={() => setShowViewingModal(false)}
+                      className="px-4 py-2 rounded-lg border border-neutral-300 text-xs font-medium cursor-pointer"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-neutral-950 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <CalendarPlus className="w-4 h-4" />
+                      {isSelf100 ? "Xác nhận đặt lịch (100% HH)" : "Xác nhận đặt lịch (50% / 50%)"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Modal Xác nhận Chốt cọc & Lập phiếu cọc (Hình 2) */}
+        {depositModalViewing && (() => {
+          const v = depositModalViewing;
+          const isSelf = !v.hybridMode || v.hybridMode === "SELF_100";
+          return (
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 overflow-y-auto">
+              <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl my-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-neutral-900">Xác nhận Chốt cọc &amp; Lập phiếu cọc</h3>
+                      <p className="text-xs text-neutral-500">
+                        Khách: <strong>{v.customerName}</strong> • {v.customerPhone}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDepositModalViewing(null)}
+                    className="p-1 hover:bg-neutral-100 rounded-lg cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Room summary card */}
+                <div className="p-3.5 rounded-xl bg-amber-50/50 border border-amber-200 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <strong className="text-neutral-900 text-sm">{v.roomLabel}</strong>
+                    <strong className="text-emerald-700 text-sm">{formatVND(v.price)}/tháng</strong>
+                  </div>
+                  <div className="text-neutral-500">
+                    {v.district} {v.address ? `• ${v.address}` : ""}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span className="px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 font-medium">
+                      {isSelf ? "Trọn gói (100% HH)" : "Phối hợp (50% Online / 50% Offline)"}
+                    </span>
+                    <span className="text-neutral-600">
+                      Sales dẫn chốt: <strong>{v.salesName}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleConfirmDepositFromViewing} className="space-y-3.5">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold text-neutral-900">Số tiền khách đặt cọc (VNĐ) *</label>
+                      <span className="text-[11px] text-neutral-500">Mặc định = 1 tháng tiền phòng</span>
+                    </div>
+                    <input
+                      type="number"
+                      required
+                      min={100000}
+                      value={depositForm.depositAmount}
+                      onChange={(e) => setDepositForm({ ...depositForm, depositAmount: e.target.value })}
+                      className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-base font-bold text-emerald-700"
+                    />
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {[
+                        { label: "100% tiền phòng (1 tháng)", val: v.price },
+                        { label: "50% cọc giữ chỗ", val: Math.round(v.price * 0.5) },
+                        { label: "2.000.000 đ", val: 2_000_000 },
+                      ].map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => setDepositForm({ ...depositForm, depositAmount: String(preset.val) })}
+                          className="px-2.5 py-1 rounded-md bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 text-[11px] font-medium cursor-pointer"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-900 mb-1">Thời hạn hợp đồng</label>
+                      <select
+                        value={depositForm.durationMonths}
+                        onChange={(e) => setDepositForm({ ...depositForm, durationMonths: e.target.value })}
+                        className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-xs bg-white"
+                      >
+                        <option value="12">12 tháng (CTY 80%)</option>
+                        <option value="6">6 tháng (CTY 50%)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-900 mb-1">
+                        Ngày dự kiến dọn vào / nhận phòng *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={depositForm.moveInDate}
+                        onChange={(e) => setDepositForm({ ...depositForm, moveInDate: e.target.value })}
+                        className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-xs bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <PaymentVerificationFields
+                    value={{
+                      customerIdCard: depositForm.customerIdCard,
+                      paymentMethod: depositForm.paymentMethod,
+                      transferAmount: depositForm.transferAmount,
+                      cashAmount: depositForm.cashAmount,
+                      evidenceUrl: depositForm.evidenceUrl,
+                    }}
+                    totalAmount={Number(depositForm.depositAmount) || v.price}
+                    qrDescription={`COC ${v.roomLabel}`}
+                    onChange={(next) => setDepositForm({ ...depositForm, ...next })}
+                  />
+
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-900 mb-1">
+                      Ghi chú phiếu đặt cọc (cam kết, thời gian bàn giao...)
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="VD: Khách đã chuyển khoản VietQR MB Bank, hẹn bàn giao chìa khóa & ký HĐ chính thức..."
+                      value={depositForm.note}
+                      onChange={(e) => setDepositForm({ ...depositForm, note: e.target.value })}
+                      className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-xs"
+                    />
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800">
+                    Sau khi xác nhận: Phòng tự động chuyển sang trạng thái <strong>Đã thuê / Đã cọc</strong>, khách chuyển sang danh sách đã đặt cọc và hệ thống tự cộng doanh số/hoa hồng cho Sales.
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setDepositModalViewing(null)}
+                      className="px-4 py-2 rounded-lg border border-neutral-300 text-xs font-medium cursor-pointer"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-4 h-4" /> Xác nhận Chốt cọc
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Modal Xem trước & Tải Hóa đơn Đặt cọc PDF */}
+        {receiptModalData && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-neutral-200 bg-neutral-50">
+                <div>
+                  <h3 className="text-base font-bold text-neutral-900">
+                    Hóa đơn / Phiếu đặt cọc — {receiptModalData.contractCode}
+                  </h3>
+                  <p className="text-xs text-neutral-500">
+                    Bấm &quot;Tải / In Hóa đơn PDF&quot; rồi chọn &quot;Save as PDF / Lưu dưới dạng PDF&quot; để tải về máy
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => printDepositReceiptPdf(receiptModalData)}
+                    className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Printer className="w-4 h-4" /> Tải / In Hóa đơn PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReceiptModalData(null)}
+                    className="p-2 rounded-lg border border-neutral-300 hover:bg-neutral-100 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto bg-neutral-200 p-4">
+                <iframe
+                  title="Hóa đơn đặt cọc PDF"
+                  srcDoc={buildDepositReceiptHtml(receiptModalData)}
+                  className="w-full h-[62vh] bg-white rounded-lg shadow border border-neutral-300"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Xem chi tiết Hợp đồng & Tiền cọc */}
+        {selectedContract && (() => {
+          const c = selectedContract;
+          const dep = c.deposits[0];
+          const isReserved = c.status === "RESERVED";
+          const isForfeited = c.status === "FORFEITED";
+          return (
+            <div className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center p-4" onClick={() => setSelectedContract(null)}>
+              <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-start justify-between border-b border-neutral-200 pb-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-bold text-amber-700">{c.contractCode}</span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          isForfeited
+                            ? "bg-rose-100 text-rose-700"
+                            : isReserved
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-emerald-100 text-emerald-700"
+                        }`}
+                      >
+                        {isForfeited
+                          ? "Đã hủy cọc (Bỏ cọc)"
+                          : isReserved
+                            ? "Đã đặt cọc (Chờ ký giấy)"
+                            : "Đã thanh toán đủ & Ký HĐ (Đã thuê)"}
+                      </span>
+                    </div>
+                    <div className="text-xs text-neutral-500 mt-1">
+                      Ngày lập: {formatDate(c.signedDate)} • Thời hạn: {c.durationMonths} tháng
+                    </div>
+                  </div>
+                  <button onClick={() => setSelectedContract(null)} className="p-1 hover:bg-neutral-100 rounded-lg cursor-pointer">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-neutral-50 p-4 rounded-xl border border-neutral-200">
+                  <div>
+                    <span className="text-neutral-500">Khách hàng:</span>{" "}
+                    <strong className="text-neutral-900">{c.customer.fullName}</strong>
+                  </div>
+                  <div>
+                    <span className="text-neutral-500">SĐT khách:</span>{" "}
+                    <strong className="text-neutral-900">{c.customer.phone}</strong>
+                  </div>
+                  <div>
+                    <span className="text-neutral-500">Phòng thuê:</span>{" "}
+                    <strong className="text-neutral-900">{c.room.property.name} — {c.room.roomNumber}</strong>
+                  </div>
+                  <div>
+                    <span className="text-neutral-500">Sales phụ trách:</span>{" "}
+                    <strong className="text-neutral-900">{c.sales.fullName}</strong>
+                  </div>
+                  <div>
+                    <span className="text-neutral-500">Giá thuê / tháng:</span>{" "}
+                    <strong className="text-neutral-900">{formatVND(c.monthlyRent)}</strong>
+                  </div>
+                  <div>
+                    <span className="text-neutral-500">Tiền đặt cọc:</span>{" "}
+                    <strong className="text-amber-700">{formatVND(c.depositAmount)}</strong>
+                  </div>
+                  <div>
+                    <span className="text-neutral-500">Hoa hồng công ty ({(c.companyCommissionRate * 100).toFixed(0)}%):</span>{" "}
+                    <strong className="text-emerald-700">{formatVND(c.companyRevenue)}</strong>
+                  </div>
+                  <div>
+                    <span className="text-neutral-500">Tiền trả chủ trọ:</span>{" "}
+                    <strong className="text-orange-700">{formatVND(c.landlordPayable)}</strong>
+                  </div>
+                </div>
+
+                {c.note && (
+                  <div className="p-3 rounded-lg bg-amber-50/60 border border-amber-200 text-xs text-neutral-700">
+                    <strong>Ghi chú:</strong> {c.note}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-100">
                   <button
                     type="button"
                     onClick={() => {
-                      setForm((f) => ({
-                        ...f,
-                        roomId: selectedRoom.id,
-                        monthlyRent: String(selectedRoom.price),
-                      }));
-                      setSelectedRoom(null);
-                      setShowContractModal(true);
+                      const matchedPm = c.note?.match(/Hình thức thanh toán:\s*([^•]+)/);
+                      setReceiptModalData({
+                        contractCode: c.contractCode,
+                        customerName: c.customer.fullName,
+                        customerPhone: c.customer.phone,
+                        customerIdCard: c.customer.idCard || undefined,
+                        roomLabel: `${c.room.property.name} — ${c.room.roomNumber}`,
+                        address: [c.room.property.address, c.room.property.district].filter(Boolean).join(", "),
+                        monthlyRent: c.monthlyRent,
+                        depositAmount: c.depositAmount,
+                        collectedAmount: dep?.collectedAmount || c.depositAmount,
+                        durationMonths: c.durationMonths,
+                        moveInDate: c.signedDate,
+                        salesName: c.sales.fullName,
+                        paymentMethodLabel: matchedPm ? matchedPm[1].trim() : undefined,
+                        evidenceUrl: c.invoiceUrl || undefined,
+                        note: c.note || undefined,
+                      });
                     }}
-                    className="px-3.5 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-xs font-bold cursor-pointer"
+                    className="px-3.5 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
                   >
-                    + Tạo hợp đồng / đặt cọc cho phòng này
+                    <Printer className="w-3.5 h-3.5" /> Xem / Tải Hóa đơn PDF
+                  </button>
+
+                  {dep && isReserved && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => openCancelDepositModal(c)}
+                        className="px-3.5 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        Hủy cọc (Chia 50/50 phần dư)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openSignRentModal(c)}
+                        className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-4 h-4" /> Thanh toán đủ &amp; Ký HĐ (→ Đã thuê)
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Modal Hủy cọc & Đối soát tiền cọc (trừ tiền giữ phòng trả chủ trọ, phần dư chia 50/50) */}
+        {cancelDepositContract && (() => {
+          const c = cancelDepositContract;
+          const holdDays = Math.max(0, Number(cancelDepositForm.holdDays || 0));
+          const collectedDeposit = Math.max(0, Number(cancelDepositForm.collectedDeposit || 0));
+          const rawHoldFee = Math.round((c.monthlyRent / 30) * holdDays);
+          const landlordHoldFee = Math.min(collectedDeposit, rawHoldFee);
+          const remainingPool = Math.max(0, collectedDeposit - landlordHoldFee);
+          const salesRemainderShare = Math.round(remainingPool * 0.5);
+          const landlordRemainderShare = remainingPool - salesRemainderShare;
+          const totalLandlordShare = landlordHoldFee + landlordRemainderShare;
+
+          return (
+            <div className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center p-4 overflow-y-auto">
+              <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl my-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-rose-700">
+                      Hủy cọc &amp; Đối soát tiền cọc ({c.contractCode})
+                    </h3>
+                    <p className="text-xs text-neutral-500">
+                      Khách: <strong>{c.customer.fullName}</strong> • {c.room.property.name} ({c.room.roomNumber})
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCancelDepositContract(null)}
+                    className="p-1 hover:bg-neutral-100 rounded-lg cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
-              )}
+
+                <form onSubmit={handleConfirmCancelDeposit} className="space-y-3.5">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-900 mb-1">
+                        Tiền khách đã đặt cọc (VNĐ)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        required
+                        value={cancelDepositForm.collectedDeposit}
+                        onChange={(e) =>
+                          setCancelDepositForm({ ...cancelDepositForm, collectedDeposit: e.target.value })
+                        }
+                        className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-xs font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-900 mb-1">
+                        Số ngày giữ phòng (hẹn nhận)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={60}
+                        required
+                        value={cancelDepositForm.holdDays}
+                        onChange={(e) =>
+                          setCancelDepositForm({ ...cancelDepositForm, holdDays: e.target.value })
+                        }
+                        className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-xs font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Live calculation breakdown */}
+                  <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-neutral-600">Giá thuê phòng / tháng:</span>
+                      <span className="font-semibold">{formatVND(c.monthlyRent)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-neutral-600">
+                        Tiền phòng {holdDays} ngày giữ chỗ (trả chủ trọ):
+                      </span>
+                      <span className="font-bold text-orange-700">- {formatVND(landlordHoldFee)}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-amber-200 pt-1.5">
+                      <span className="text-neutral-700 font-semibold">Phần cọc dư còn lại (chia 50/50):</span>
+                      <span className="font-bold text-neutral-900">{formatVND(remainingPool)}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <div className="p-2.5 rounded-lg bg-white border border-orange-200">
+                        <div className="text-[11px] text-neutral-500">Tổng trả Chủ trọ</div>
+                        <div className="text-sm font-bold text-orange-700">{formatVND(totalLandlordShare)}</div>
+                        <div className="text-[10px] text-neutral-400">
+                          ({formatVND(landlordHoldFee)} + 50% dư)
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-white border border-emerald-200">
+                        <div className="text-[11px] text-neutral-500">Phần bên Sales / CTY (50% dư)</div>
+                        <div className="text-sm font-bold text-emerald-700">{formatVND(salesRemainderShare)}</div>
+                        <div className="text-[10px] text-neutral-400">Cộng vào doanh số Sales</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-900 mb-1">Lý do hủy cọc</label>
+                    <textarea
+                      rows={2}
+                      value={cancelDepositForm.note}
+                      onChange={(e) => setCancelDepositForm({ ...cancelDepositForm, note: e.target.value })}
+                      placeholder="VD: Quá ngày hẹn nhận phòng khách không tới nhận..."
+                      className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-xs"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setCancelDepositContract(null)}
+                      className="px-4 py-2 rounded-lg border border-neutral-300 text-xs font-medium cursor-pointer"
+                    >
+                      Đóng
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer"
+                    >
+                      Xác nhận Hủy cọc &amp; Mở lại phòng
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Modal Thanh toán đủ & Ký Hợp đồng (CCCD + Hình thức thanh toán + Minh chứng) */}
+        {signRentContract && (
+          <div className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl my-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-bold text-neutral-900">
+                    Xác nhận Thanh toán đủ &amp; Ký Hợp đồng
+                  </h3>
+                  <p className="text-xs text-neutral-500">
+                    {signRentContract.contractCode} • Khách: <strong>{signRentContract.customer.fullName}</strong> •{" "}
+                    {signRentContract.room.property.name} ({signRentContract.room.roomNumber})
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSignRentContract(null)}
+                  className="p-1 hover:bg-neutral-100 rounded-lg cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
+                <span className="text-emerald-900 font-medium">Tổng tiền cọc / hợp đồng cần xác nhận:</span>
+                <strong className="text-sm text-emerald-700">{formatVND(signRentContract.depositAmount)}</strong>
+              </div>
+
+              <form onSubmit={handleConfirmSignAndRent} className="space-y-3.5">
+                <PaymentVerificationFields
+                  value={{
+                    customerIdCard: signRentForm.customerIdCard,
+                    paymentMethod: signRentForm.paymentMethod,
+                    transferAmount: signRentForm.transferAmount,
+                    cashAmount: signRentForm.cashAmount,
+                    evidenceUrl: signRentForm.evidenceUrl,
+                  }}
+                  totalAmount={signRentContract.depositAmount}
+                  qrDescription={`THANH TOAN ${signRentContract.contractCode}`}
+                  onChange={(next) => setSignRentForm({ ...signRentForm, ...next })}
+                />
+
+                <div>
+                  <label className="block text-xs font-bold text-neutral-900 mb-1">
+                    Ghi chú bàn giao &amp; thanh toán
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={signRentForm.note}
+                    onChange={(e) => setSignRentForm({ ...signRentForm, note: e.target.value })}
+                    placeholder="VD: Đã thu đủ tiền, bàn giao chìa khóa & ký hợp đồng bản cứng..."
+                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-xs"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setSignRentContract(null)}
+                    className="px-4 py-2 rounded-lg border border-neutral-300 text-xs font-medium cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-4 h-4" /> Xác nhận Thanh toán &amp; Chuyển Đã thuê
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Thêm Khu vực / Tòa nhà mới theo Quận */}
+        {showPropertyModal && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-neutral-900">
+                  {editingPropertyId ? "Chỉnh sửa Quận & Khu vực" : "Thêm Khu vực / Tòa nhà mới"}
+                </h3>
+                <button type="button" onClick={() => { setShowPropertyModal(false); setEditingPropertyId(null); }} className="p-1 hover:bg-neutral-100 rounded-lg cursor-pointer">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <form onSubmit={handleCreateProperty} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Quận / Thành phố *</label>
+                  <input
+                    required
+                    list="hcm-districts"
+                    placeholder="VD: Bình Thạnh, Quận 7, TP. Thủ Đức..."
+                    value={propertyForm.district}
+                    onChange={(e) => setPropertyForm({ ...propertyForm, district: e.target.value })}
+                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Tên Khu vực / Tòa nhà *</label>
+                  <input
+                    required
+                    placeholder="VD: Khu Phan Văn Trị, Chung cư Vinhomes, Nhà trọ D2..."
+                    value={propertyForm.name}
+                    onChange={(e) => setPropertyForm({ ...propertyForm, name: e.target.value })}
+                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Địa chỉ cụ thể *</label>
+                  <input
+                    required
+                    placeholder="VD: 148 Điện Biên Phủ, P.17..."
+                    value={propertyForm.address}
+                    onChange={(e) => setPropertyForm({ ...propertyForm, address: e.target.value })}
+                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    required
+                    placeholder="Tên chủ trọ / Quản lý *"
+                    value={propertyForm.landlordName}
+                    onChange={(e) => setPropertyForm({ ...propertyForm, landlordName: e.target.value })}
+                    className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                  <input
+                    required
+                    placeholder="SĐT chủ trọ *"
+                    value={propertyForm.landlordPhone}
+                    onChange={(e) => setPropertyForm({ ...propertyForm, landlordPhone: e.target.value })}
+                    className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button type="button" onClick={() => setShowPropertyModal(false)} className="px-4 py-2 rounded-lg border text-sm cursor-pointer">
+                    Hủy
+                  </button>
+                  <button type="submit" className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm font-bold cursor-pointer">
+                    Lưu khu vực
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
@@ -1499,20 +3455,11 @@ export default function SalesPage() {
             </div>
           </div>
         )}
-        {/* Lightbox xem ảnh hóa đơn phóng to */}
-        {previewInvoiceUrl && (
-          <div className="fixed inset-0 z-[60] bg-black/75 flex items-center justify-center p-4" onClick={() => setPreviewInvoiceUrl(null)}>
-            <div className="bg-white rounded-2xl max-w-xl w-full p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between">
-                <div className="font-bold text-sm text-neutral-900">Ảnh hóa đơn / Chứng từ minh chứng</div>
-                <button onClick={() => setPreviewInvoiceUrl(null)} className="p-1 rounded-lg hover:bg-neutral-100 cursor-pointer">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <img src={previewInvoiceUrl} alt="Hóa đơn" className="w-full max-h-[75vh] object-contain rounded-lg border border-neutral-200" />
-            </div>
-          </div>
-        )}
+        <AttachmentPreviewModal
+          url={previewInvoiceUrl}
+          title="File PDF hóa đơn / Chứng từ minh chứng"
+          onClose={() => setPreviewInvoiceUrl(null)}
+        />
       </div>
     </AppShell>
   );

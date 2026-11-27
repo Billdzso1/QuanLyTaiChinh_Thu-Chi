@@ -41,6 +41,7 @@ export async function POST(request: Request) {
   const body = await request.json();
   const isFinance = canAccessFinance(user.role as UserRole);
 
+  const txDate = body.transactionDate ? new Date(body.transactionDate) : new Date();
   const tx = await prisma.transaction.create({
     data: {
       code: generateCode("TC"),
@@ -55,10 +56,40 @@ export async function POST(request: Request) {
       approvalStatus: isFinance ? body.approvalStatus || "APPROVED" : "PENDING",
       paymentStatus: isFinance ? body.paymentStatus || "PAID" : "UNPAID",
       isDebt: Boolean(body.isDebt),
-      transactionDate: body.transactionDate ? new Date(body.transactionDate) : new Date(),
+      transactionDate: txDate,
     },
     include: { category: true, department: true },
   });
+
+  // Tự động cập nhật số tiền đã sử dụng vào Ngân sách phòng ban (nếu có gói ngân sách tháng đó)
+  if (tx.type === "EXPENSE") {
+    const matchingBudget = await prisma.departmentBudget.findFirst({
+      where: {
+        departmentId: tx.departmentId,
+        month: txDate.getMonth() + 1,
+        year: txDate.getFullYear(),
+      },
+    });
+    if (matchingBudget) {
+      const newUsed = matchingBudget.usedAmount + tx.amount;
+      await prisma.departmentBudget.update({
+        where: { id: matchingBudget.id },
+        data: {
+          usedAmount: newUsed,
+          status: newUsed > matchingBudget.allocatedAmount ? "EXCEEDED" : "ACTIVE",
+        },
+      });
+      await prisma.budgetExpense.create({
+        data: {
+          departmentBudgetId: matchingBudget.id,
+          title: tx.title,
+          amount: tx.amount,
+          expenseDate: txDate,
+          note: `Tự động liên kết từ ${tx.code}`,
+        },
+      });
+    }
+  }
 
   await logAudit({
     userId: user.id,
@@ -73,17 +104,45 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   const user = await getCurrentUser();
-  if (!user || !canAccessFinance(user.role as UserRole)) {
-    return NextResponse.json({ error: "Không có quyền cập nhật giao dịch" }, { status: 403 });
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const body = await request.json();
+
+  if (body.action === "UPLOAD_VOUCHER") {
+    const existing = await prisma.transaction.findUnique({ where: { id: body.id } });
+    if (!existing) {
+      return NextResponse.json({ error: "Không tìm thấy giao dịch" }, { status: 404 });
+    }
+    if (!canAccessFinance(user.role as UserRole) && existing.createdById !== user.id) {
+      return NextResponse.json({ error: "Không có quyền đính kèm chứng từ cho giao dịch này" }, { status: 403 });
+    }
+    const updated = await prisma.transaction.update({
+      where: { id: body.id },
+      data: { voucherUrl: body.voucherUrl || null },
+    });
+    await logAudit({
+      userId: user.id,
+      action: "UPLOAD_TRANSACTION_VOUCHER",
+      entity: "Transaction",
+      entityId: updated.id,
+      details: `Đính kèm chứng từ/scan cho ${updated.code}`,
+    });
+    return NextResponse.json({ transaction: updated });
+  }
+
+  if (!canAccessFinance(user.role as UserRole)) {
+    return NextResponse.json({ error: "Không có quyền cập nhật giao dịch" }, { status: 403 });
+  }
+
   const updated = await prisma.transaction.update({
     where: { id: body.id },
     data: {
       approvalStatus: body.approvalStatus,
       paymentStatus: body.paymentStatus,
       isDebt: body.isDebt !== undefined ? Boolean(body.isDebt) : undefined,
+      voucherUrl: body.voucherUrl !== undefined ? body.voucherUrl : undefined,
     },
   });
 

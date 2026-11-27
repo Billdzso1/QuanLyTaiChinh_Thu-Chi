@@ -3,6 +3,7 @@ import { getCurrentUser, canAccessFinance, UserRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateCode } from "@/lib/finance";
 import { logAudit } from "@/lib/audit";
+import { readContractSplits, saveContractSplit, allocateContractRevenue } from "@/lib/contractSplits";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -13,18 +14,42 @@ export async function GET() {
     where.salesId = user.id;
   }
 
-  const contracts = await prisma.contract.findMany({
-    where,
-    include: {
-      customer: true,
-      room: { include: { property: true } },
-      sales: { select: { id: true, fullName: true, employeeCode: true } },
-      deposits: true,
-    },
-    orderBy: { signedDate: "desc" },
-  });
+  const [contracts, allActiveContracts, splits] = await Promise.all([
+    prisma.contract.findMany({
+      where,
+      include: {
+        customer: true,
+        room: { include: { property: true } },
+        sales: { select: { id: true, fullName: true, employeeCode: true } },
+        deposits: true,
+      },
+      orderBy: { signedDate: "desc" },
+    }),
+    prisma.contract.findMany({
+      where: { status: { in: ["ACTIVE", "FORFEITED"] } },
+      select: { id: true, salesId: true, companyRevenue: true },
+    }),
+    readContractSplits(),
+  ]);
 
-  return NextResponse.json({ contracts });
+  const statsMap = allocateContractRevenue(allActiveContracts, splits);
+
+  return NextResponse.json({ contracts, salesStats: statsMap });
+}
+
+function formatPaymentSummary(
+  paymentMethod?: string,
+  transferAmount?: number | string,
+  cashAmount?: number | string
+): string {
+  if (paymentMethod === "TRANSFER") return "Hình thức thanh toán: Chuyển khoản";
+  if (paymentMethod === "CASH") return "Hình thức thanh toán: Tiền mặt";
+  if (paymentMethod === "MIXED") {
+    const ck = Number(transferAmount || 0).toLocaleString("vi-VN");
+    const tm = Number(cashAmount || 0).toLocaleString("vi-VN");
+    return `Hình thức thanh toán: Chuyển khoản (${ck} đ) + Tiền mặt (${tm} đ)`;
+  }
+  return "";
 }
 
 export async function POST(request: Request) {
@@ -45,9 +70,14 @@ export async function POST(request: Request) {
   const endDate = new Date(signedDate);
   endDate.setMonth(endDate.getMonth() + durationMonths);
 
+  const isDepositOnly = Boolean(body.isDepositOnly);
   const collectedAmount = Number(body.collectedAmount || 0);
   const collectionStatus =
     collectedAmount >= depositAmount ? "COLLECTED" : collectedAmount > 0 ? "PARTIAL" : "UNPAID";
+  const isFullySignedAndPaid = !isDepositOnly && collectionStatus === "COLLECTED";
+
+  const paymentSummary = formatPaymentSummary(body.paymentMethod, body.transferAmount, body.cashAmount);
+  const combinedNote = [String(body.note || "").trim(), paymentSummary].filter(Boolean).join(" • ") || null;
 
   const contract = await prisma.contract.create({
     data: {
@@ -64,8 +94,9 @@ export async function POST(request: Request) {
       signedDate,
       startDate: signedDate,
       endDate,
-      status: "ACTIVE",
-      note: body.note || null,
+      status: isFullySignedAndPaid ? "ACTIVE" : "RESERVED",
+      invoiceUrl: body.evidenceUrl || null,
+      note: combinedNote,
       deposits: {
         create: {
           totalDeposit: depositAmount,
@@ -82,18 +113,39 @@ export async function POST(request: Request) {
     include: { deposits: true, customer: true, room: true },
   });
 
+  // Lưu chia hoa hồng 50% Sales Online / 50% Sales Offline nếu là lịch phối hợp
+  const offlineSalesId = body.salesId || user.id;
+  if (
+    body.hybridMode &&
+    body.hybridMode !== "SELF_100" &&
+    body.onlineSalesId &&
+    body.onlineSalesId !== offlineSalesId
+  ) {
+    await saveContractSplit({
+      contractId: contract.id,
+      onlineSalesId: body.onlineSalesId,
+      offlineSalesId,
+      onlineShare: 0.5,
+      offlineShare: 0.5,
+    });
+  }
+
   // Update room & customer status
   await prisma.room.update({
     where: { id: body.roomId },
-    data: { status: collectionStatus === "COLLECTED" ? "RENTED" : "RESERVED" },
+    data: { status: isFullySignedAndPaid ? "RENTED" : "RESERVED" },
   });
+  const idCardTrimmed = String(body.customerIdCard || "").trim();
   await prisma.customer.update({
     where: { id: body.customerId },
-    data: { status: collectionStatus === "COLLECTED" ? "SIGNED" : "DEPOSITED" },
+    data: {
+      status: isFullySignedAndPaid ? "SIGNED" : "DEPOSITED",
+      ...(idCardTrimmed ? { idCard: idCardTrimmed } : {}),
+    },
   });
 
-  // Nếu đã thu cọc, ghi nhận giao dịch thu hoa hồng công ty
-  if (collectedAmount >= depositAmount) {
+  // Nếu đã thanh toán đủ & ký hợp đồng chính thức, ghi nhận giao dịch thu hoa hồng công ty
+  if (isFullySignedAndPaid) {
     const cat = await prisma.category.findUnique({ where: { code: "INC_COMMISSION" } });
     if (cat) {
       await prisma.transaction.create({
@@ -153,6 +205,167 @@ export async function PATCH(request: Request) {
     include: { contract: true },
   });
   if (!deposit) return NextResponse.json({ error: "Không tìm thấy phiếu cọc" }, { status: 404 });
+
+  if (body.action === "SIGN_AND_RENT") {
+    const updated = await prisma.deposit.update({
+      where: { id: deposit.id },
+      data: {
+        collectedAmount: deposit.totalDeposit,
+        remainingAmount: 0,
+        collectionStatus: "COLLECTED",
+        collectedAt: new Date(),
+      },
+    });
+    const paymentSummary = formatPaymentSummary(body.paymentMethod, body.transferAmount, body.cashAmount);
+    const extraNote = [String(body.note || "").trim(), paymentSummary].filter(Boolean).join(" • ");
+    const nextNote = [deposit.contract.note, extraNote].filter(Boolean).join(" • ") || null;
+
+    await prisma.contract.update({
+      where: { id: deposit.contractId },
+      data: {
+        status: "ACTIVE",
+        ...(body.evidenceUrl ? { invoiceUrl: body.evidenceUrl } : {}),
+        ...(extraNote ? { note: nextNote } : {}),
+      },
+    });
+    await prisma.room.update({
+      where: { id: deposit.contract.roomId },
+      data: { status: "RENTED" },
+    });
+    const idCardTrimmed = String(body.customerIdCard || "").trim();
+    await prisma.customer.update({
+      where: { id: deposit.contract.customerId },
+      data: {
+        status: "SIGNED",
+        ...(idCardTrimmed ? { idCard: idCardTrimmed } : {}),
+      },
+    });
+
+    const cat = await prisma.category.findUnique({ where: { code: "INC_COMMISSION" } });
+    if (cat) {
+      await prisma.transaction.create({
+        data: {
+          code: generateCode("TC"),
+          type: "INCOME",
+          title: `Hoa hồng hợp đồng ${deposit.contract.contractCode} (${deposit.contract.durationMonths} tháng - ${(deposit.contract.companyCommissionRate * 100).toFixed(0)}%)`,
+          amount: deposit.companyShare,
+          categoryId: cat.id,
+          departmentId: user.departmentId,
+          createdById: user.id,
+          reason: "Thanh toán đủ & ký HĐ chính thức",
+          approvalStatus: "APPROVED",
+          paymentStatus: "PAID",
+          transactionDate: new Date(),
+        },
+      });
+    }
+
+    await logAudit({
+      userId: user.id,
+      action: "SIGN_AND_RENT_CONTRACT",
+      entity: "Contract",
+      entityId: deposit.contractId,
+      details: `Thanh toán đủ & ký HĐ ${deposit.contract.contractCode} — chuyển phòng sang Đã thuê`,
+    });
+    return NextResponse.json({ deposit: updated });
+  }
+
+  if (body.action === "CANCEL_DEPOSIT") {
+    const holdDays = Math.max(0, Number(body.holdDays ?? 7));
+    const collectedDeposit = Math.max(
+      0,
+      Number(
+        body.collectedDeposit ??
+          (deposit.collectedAmount > 0 ? deposit.collectedAmount : deposit.totalDeposit)
+      )
+    );
+    const monthlyRent = deposit.contract.monthlyRent;
+    const rawHoldFee = Math.round((monthlyRent / 30) * holdDays);
+    const landlordHoldFee = Math.min(collectedDeposit, rawHoldFee);
+    const remainingPool = Math.max(0, collectedDeposit - landlordHoldFee);
+    const salesRemainderShare = Math.round(remainingPool * 0.5);
+    const landlordRemainderShare = remainingPool - salesRemainderShare;
+    const totalLandlordShare = landlordHoldFee + landlordRemainderShare;
+
+    const cancelSummary = `Hủy cọc (${holdDays} ngày giữ phòng: ${landlordHoldFee.toLocaleString("vi-VN")}đ trả chủ trọ, dư ${remainingPool.toLocaleString("vi-VN")}đ chia 50/50 -> Chủ trọ thêm ${landlordRemainderShare.toLocaleString("vi-VN")}đ, Sales ${salesRemainderShare.toLocaleString("vi-VN")}đ)`;
+    const cancelNote = [String(body.note || "").trim(), cancelSummary].filter(Boolean).join(" • ");
+    const nextNote = [deposit.contract.note, cancelNote].filter(Boolean).join(" • ");
+
+    const updated = await prisma.deposit.update({
+      where: { id: deposit.id },
+      data: {
+        collectedAmount: collectedDeposit,
+        remainingAmount: 0,
+        companyShare: salesRemainderShare,
+        landlordShare: totalLandlordShare,
+        collectionStatus: "COLLECTED",
+        landlordPayoutStatus: totalLandlordShare > 0 ? "UNPAID" : "PAID",
+        collectedAt: deposit.collectedAt || new Date(),
+      },
+    });
+
+    await prisma.contract.update({
+      where: { id: deposit.contractId },
+      data: {
+        status: "FORFEITED",
+        companyRevenue: salesRemainderShare,
+        landlordPayable: totalLandlordShare,
+        note: nextNote,
+      },
+    });
+
+    await prisma.room.update({
+      where: { id: deposit.contract.roomId },
+      data: { status: "AVAILABLE" },
+    });
+
+    await prisma.customer.update({
+      where: { id: deposit.contract.customerId },
+      data: { status: "POTENTIAL" },
+    });
+
+    if (salesRemainderShare > 0) {
+      const cat = await prisma.category.findUnique({ where: { code: "INC_COMMISSION" } });
+      if (cat) {
+        await prisma.transaction.create({
+          data: {
+            code: generateCode("TC"),
+            type: "INCOME",
+            title: `Chia 50% tiền cọc dư sau hủy cọc ${deposit.contract.contractCode}`,
+            amount: salesRemainderShare,
+            categoryId: cat.id,
+            departmentId: user.departmentId,
+            createdById: user.id,
+            reason: cancelSummary,
+            approvalStatus: "APPROVED",
+            paymentStatus: "PAID",
+            transactionDate: new Date(),
+          },
+        });
+      }
+    }
+
+    await logAudit({
+      userId: user.id,
+      action: "CANCEL_DEPOSIT",
+      entity: "Contract",
+      entityId: deposit.contractId,
+      details: `${deposit.contract.contractCode}: ${cancelSummary}`,
+    });
+
+    return NextResponse.json({
+      deposit: updated,
+      breakdown: {
+        collectedDeposit,
+        holdDays,
+        landlordHoldFee,
+        remainingPool,
+        salesRemainderShare,
+        landlordRemainderShare,
+        totalLandlordShare,
+      },
+    });
+  }
 
   if (body.action === "COLLECT_DEPOSIT") {
     const collected = Number(body.collectedAmount ?? deposit.totalDeposit);

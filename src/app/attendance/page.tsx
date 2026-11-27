@@ -312,7 +312,7 @@ export default function AttendancePage() {
                           : "bg-amber-100 text-amber-800"
                           }`}
                       >
-                        {a.status === "PRESENT" ? "Đúng giờ" : a.status === "LATE" ? "Đi muộn" : a.status}
+                        {getStatusLabel(a.status)}
                       </span>
                     </td>
                     <td className="px-4 py-3">
