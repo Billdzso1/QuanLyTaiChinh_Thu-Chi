@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -237,22 +237,22 @@ export default function LandlordOperationsPage() {
     <AppShell>
       <div className="space-y-6 pb-8">
         {/* Hero */}
-        <div className="relative overflow-hidden rounded-[28px] border border-amber-400/40 bg-[#09090b] p-6 sm:p-8 text-white shadow-xl">
+        <div className="relative overflow-hidden rounded-[28px] border border-indigo-400/30 bg-gradient-to-br from-slate-900 via-indigo-950 to-sky-950 p-6 sm:p-8 text-white shadow-xl">
           <div
-            className="pointer-events-none absolute inset-0 opacity-25"
+            className="pointer-events-none absolute inset-0 opacity-30"
             style={{
               backgroundImage:
-                "radial-gradient(circle at 85% 20%, rgba(251,191,36,0.35), transparent 45%), radial-gradient(circle at 15% 85%, rgba(16,185,129,0.2), transparent 45%)",
+                "radial-gradient(circle at 85% 20%, rgba(56,189,248,0.35), transparent 45%), radial-gradient(circle at 15% 85%, rgba(99,102,241,0.3), transparent 45%)",
             }}
           />
           <div className="relative z-10 space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full bg-amber-400/15 border border-amber-400/40 px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-300">
+            <div className="inline-flex items-center gap-2 rounded-full bg-cyan-400/15 border border-cyan-400/35 px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-cyan-200">
               <Sparkles className="w-3.5 h-3.5" /> Quản trị Cư dân &amp; Vận hành Tòa nhà
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-white via-amber-100 to-amber-400 bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-white via-sky-100 to-cyan-300 bg-clip-text text-transparent">
               Cư dân, Tạm trú, Bảng giá &amp; Vận hành
             </h1>
-            <p className="text-xs sm:text-sm text-neutral-300 max-w-2xl">
+            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl">
               Quản lý danh sách cư dân đang ở, khai báo tạm trú, biển số xe, thẻ từ, bảng giá dịch vụ riêng từng khu nhà và chi phí vận hành tòa nhà.
             </p>
           </div>
@@ -291,7 +291,7 @@ export default function LandlordOperationsPage() {
                 Khách thuê chính đang ở ({tenants.length} phòng)
               </div>
               <table className="w-full text-xs">
-                <thead className="bg-neutral-950 text-amber-300">
+                <thead className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-cyan-200">
                   <tr>
                     <th className="px-4 py-3 text-left">Phòng / Khu vực</th>
                     <th className="px-4 py-3 text-left">Khách thuê</th>
@@ -614,7 +614,7 @@ export default function LandlordOperationsPage() {
 
             <div className="bg-white rounded-3xl border border-neutral-200 overflow-x-auto shadow-sm">
               <table className="w-full text-xs">
-                <thead className="bg-neutral-950 text-amber-300">
+                <thead className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-cyan-200">
                   <tr>
                     <th className="px-4 py-3 text-left">Tháng</th>
                     <th className="px-4 py-3 text-left">Khu nhà</th>

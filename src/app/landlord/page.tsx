@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -400,44 +400,44 @@ export default function LandlordPortalPage() {
   return (
     <AppShell>
       <div className="space-y-6 pb-8">
-        {/* Executive Obsidian-Gold Hero Stage */}
-        <div className="relative overflow-hidden rounded-[28px] border border-amber-400/40 bg-[#09090b] p-6 sm:p-8 text-white shadow-[0_24px_60px_-15px_rgba(0,0,0,0.45)]">
+        {/* Modern Indigo-Cyan Hero Stage */}
+        <div className="relative overflow-hidden rounded-[28px] border border-indigo-400/30 bg-gradient-to-br from-slate-900 via-indigo-950 to-sky-950 p-6 sm:p-8 text-white shadow-[0_24px_60px_-15px_rgba(30,41,59,0.45)]">
           <div
-            className="pointer-events-none absolute inset-0 opacity-25"
+            className="pointer-events-none absolute inset-0 opacity-30"
             style={{
               backgroundImage:
-                "radial-gradient(circle at 85% 15%, rgba(251,191,36,0.38), transparent 45%), radial-gradient(circle at 15% 90%, rgba(16,185,129,0.22), transparent 45%), linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px)",
+                "radial-gradient(circle at 85% 15%, rgba(56,189,248,0.38), transparent 45%), radial-gradient(circle at 15% 90%, rgba(99,102,241,0.35), transparent 45%), linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px)",
               backgroundSize: "100% 100%, 100% 100%, 36px 36px, 36px 36px",
             }}
           />
 
           <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full bg-amber-400/15 border border-amber-400/40 px-3.5 py-1 text-[11px] font-bold tracking-wider uppercase text-amber-300">
+              <div className="inline-flex items-center gap-2 rounded-full bg-cyan-400/15 border border-cyan-400/35 px-3.5 py-1 text-[11px] font-bold tracking-wider uppercase text-cyan-200">
                 <Sparkles className="w-3.5 h-3.5" /> NDAHOME Property Executive
               </div>
-              <h1 className="text-2xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-white via-amber-100 to-amber-400 bg-clip-text text-transparent">
+              <h1 className="text-2xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-white via-sky-100 to-cyan-300 bg-clip-text text-transparent">
                 Cổng Chủ Trọ &amp; Quản Lý Hệ Thống Phòng
               </h1>
-              <p className="text-xs sm:text-sm text-neutral-300/90 max-w-2xl leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-300/95 max-w-2xl leading-relaxed">
                 Điều hành tập trung toàn bộ tòa nhà theo từng quận, kiểm soát trạng thái phòng thời gian thực, xem hợp đồng và đối soát dòng tiền với NDAHOME.
               </p>
 
               {data && (
                 <div className="pt-2 flex flex-wrap items-center gap-4">
-                  <div className="inline-flex items-center gap-2 rounded-xl bg-white/[0.06] border border-white/10 px-3.5 py-2 text-xs">
+                  <div className="inline-flex items-center gap-2 rounded-xl bg-white/[0.08] border border-white/15 px-3.5 py-2 text-xs">
                     <TrendingUp className="w-4 h-4 text-emerald-400" />
-                    <span className="text-neutral-300">Tỷ lệ lấp đầy:</span>
+                    <span className="text-slate-200">Tỷ lệ lấp đầy:</span>
                     <strong className="text-emerald-300 text-sm">{occupancyRate}%</strong>
                     <div className="w-24 h-2 rounded-full bg-white/15 overflow-hidden ml-1">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-amber-300 via-amber-400 to-emerald-400 transition-all duration-700"
+                        className="h-full rounded-full bg-gradient-to-r from-indigo-400 via-cyan-400 to-emerald-400 transition-all duration-700"
                         style={{ width: `${occupancyRate}%` }}
                       />
                     </div>
                   </div>
-                  <div className="inline-flex items-center gap-2 rounded-xl bg-white/[0.06] border border-white/10 px-3.5 py-2 text-xs text-neutral-300">
-                    <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  <div className="inline-flex items-center gap-2 rounded-xl bg-white/[0.08] border border-white/15 px-3.5 py-2 text-xs text-slate-200">
+                    <ShieldCheck className="w-4 h-4 text-cyan-300" />
                     <span>{data.stats.totalProperties} khu nhà · {data.stats.totalRooms} phòng</span>
                   </div>
                 </div>
@@ -676,7 +676,7 @@ export default function LandlordPortalPage() {
                       : r.status === "RESERVED"
                         ? { label: "Đã đặt cọc", dot: "bg-amber-500", cls: "bg-white/95 text-amber-800 border border-amber-200" }
                         : r.status === "RENTED"
-                          ? { label: "Đã thuê", dot: "bg-sky-400", cls: "bg-neutral-950/90 text-amber-300 border border-amber-500/40" }
+                          ? { label: "Đã thuê", dot: "bg-cyan-300", cls: "bg-indigo-950/90 text-cyan-200 border border-cyan-400/40" }
                           : { label: "Bảo trì", dot: "bg-rose-500", cls: "bg-rose-50/95 text-rose-700 border border-rose-200" };
 
                   const amenityTags = (r.amenities || "")
@@ -688,7 +688,7 @@ export default function LandlordPortalPage() {
                   return (
                     <div
                       key={r.id}
-                      className="group bg-white rounded-3xl border border-neutral-200/90 overflow-hidden shadow-sm flex flex-col transition-all duration-300 ease-out hover:-translate-y-2 hover:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.16)] hover:border-amber-400/80"
+                      className="group bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-sm flex flex-col transition-all duration-300 ease-out hover:-translate-y-2 hover:shadow-[0_24px_48px_-12px_rgba(79,70,229,0.16)] hover:border-indigo-400/70"
                     >
                       <div className="relative aspect-[16/10] bg-neutral-100 overflow-hidden">
                         {r.imageUrl ? (
@@ -835,7 +835,7 @@ export default function LandlordPortalPage() {
                               });
                               setShowRoomModal(true);
                             }}
-                            className="px-3 py-1.5 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-amber-400 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition"
+                            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-sm shadow-indigo-500/20 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition"
                           >
                             <Pencil className="w-3 h-3" /> Chỉnh sửa
                           </button>
@@ -883,7 +883,7 @@ export default function LandlordPortalPage() {
                         });
                         setShowPropertyModal(true);
                       }}
-                      className="px-3.5 py-2 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-amber-400 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shrink-0 transition"
+                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-sm shadow-indigo-500/20 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shrink-0 transition"
                     >
                       <Pencil className="w-3.5 h-3.5" /> Sửa
                     </button>
@@ -1074,7 +1074,7 @@ export default function LandlordPortalPage() {
 
                 <div className="bg-white rounded-3xl border border-neutral-200 overflow-x-auto shadow-sm">
                   <table className="w-full text-xs">
-                    <thead className="bg-neutral-950 text-amber-300">
+                    <thead className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-cyan-200">
                       <tr>
                         <th className="px-5 py-3.5 text-left font-bold">Khu nhà</th>
                         <th className="px-5 py-3.5 text-left font-bold">Quận</th>
@@ -1108,7 +1108,7 @@ export default function LandlordPortalPage() {
         ) : (
           <div className="bg-white rounded-3xl border border-neutral-200 overflow-x-auto shadow-sm">
             <table className="w-full text-sm">
-              <thead className="bg-neutral-950 text-amber-300 text-xs">
+              <thead className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-cyan-200 text-xs">
                 <tr>
                   <th className="px-5 py-4 text-left font-bold">Mã HĐ &amp; Trạng thái</th>
                   <th className="px-5 py-4 text-left font-bold">Phòng / Khách / Chủ</th>
@@ -1171,7 +1171,7 @@ export default function LandlordPortalPage() {
                         <button
                           type="button"
                           onClick={() => setSelectedContract(c)}
-                          className="px-3.5 py-1.5 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-amber-400 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition"
+                          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-sm shadow-indigo-500/20 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition"
                         >
                           <FileText className="w-3.5 h-3.5" /> Xem HĐ
                         </button>
