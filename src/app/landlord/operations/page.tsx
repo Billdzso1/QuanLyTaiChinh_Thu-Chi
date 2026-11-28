@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -271,7 +271,7 @@ export default function LandlordOperationsPage() {
               type="button"
               onClick={() => setTab(t.id as typeof tab)}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                tab === t.id ? "bg-neutral-950 text-amber-400 shadow-md" : "text-neutral-600 hover:bg-neutral-100"
+                tab === t.id ? "bg-indigo-600 text-white shadow-sm shadow-md" : "text-neutral-600 hover:bg-neutral-100"
               }`}
             >
               {t.icon} {t.label}
@@ -407,7 +407,7 @@ export default function LandlordOperationsPage() {
                 </label>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-neutral-950 text-amber-400 border border-amber-500 font-bold cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 font-bold cursor-pointer"
                 >
                   Lưu cư dân &amp; xe
                 </button>
@@ -532,7 +532,7 @@ export default function LandlordOperationsPage() {
                 </div>
               </div>
               <div className="flex justify-end">
-                <button type="submit" className="px-5 py-2 rounded-xl bg-neutral-950 text-amber-400 border border-amber-500 font-bold cursor-pointer">
+                <button type="submit" className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 font-bold cursor-pointer">
                   Lưu bảng giá khu nhà
                 </button>
               </div>
@@ -606,7 +606,7 @@ export default function LandlordOperationsPage() {
                   placeholder="Số tiền"
                   className="w-full border border-neutral-300 rounded-xl px-3 py-2 font-bold"
                 />
-                <button type="submit" className="px-4 py-2 rounded-xl bg-neutral-950 text-amber-400 font-bold shrink-0 cursor-pointer">
+                <button type="submit" className="px-4 py-2 rounded-xl bg-indigo-600 text-white shadow-sm font-bold shrink-0 cursor-pointer">
                   Lưu
                 </button>
               </div>
@@ -666,7 +666,7 @@ export default function LandlordOperationsPage() {
                 {supportSentMsg}
               </div>
             )}
-            <button type="submit" className="px-5 py-2.5 rounded-xl bg-neutral-950 text-amber-400 border border-amber-500 font-bold inline-flex items-center gap-2 cursor-pointer">
+            <button type="submit" className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 font-bold inline-flex items-center gap-2 cursor-pointer">
               <Send className="w-4 h-4" /> Gửi thông báo ngay
             </button>
           </form>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
+import { requirePermission } from "@/lib/permissionsServer";
 
 function normalizeText(s?: string | null): string {
   return String(s || "").trim().toLowerCase();
@@ -24,7 +25,9 @@ function isOwnedByLandlord(
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user || user.role !== "LANDLORD") {
+  const denied = await requirePermission(user, "landlord", "view");
+  if (denied) return denied;
+  if (!user || (user.role !== "LANDLORD" && user.role !== "ADMIN")) {
     return NextResponse.json({ error: "Chỉ tài khoản Chủ trọ mới được truy cập" }, { status: 403 });
   }
 
@@ -99,7 +102,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
-  if (!user || user.role !== "LANDLORD") {
+  const denied = await requirePermission(user, "landlord", "create");
+  if (denied) return denied;
+  if (!user) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -169,7 +174,9 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   const user = await getCurrentUser();
-  if (!user || user.role !== "LANDLORD") {
+  const denied = await requirePermission(user, "landlord", "edit");
+  if (denied) return denied;
+  if (!user) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

@@ -208,7 +208,7 @@ export default function PayrollPage() {
             </select>
             <button
               onClick={handleGenerate}
-              className="px-3.5 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium inline-flex items-center gap-1.5 cursor-pointer"
             >
               <Calculator className="w-4 h-4" /> Tính lương tự động
             </button>
@@ -313,7 +313,7 @@ export default function PayrollPage() {
                 <Eye className="w-3.5 h-3.5" /> Xem bản đã lưu
               </button>
             )}
-            <label className="px-3 py-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer">
+            <label className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer">
               <Camera className="w-3.5 h-3.5" />
               {uploadingDoc ? "Đang tải..." : "Scan ảnh (Camera)"}
               <input
@@ -476,7 +476,7 @@ export default function PayrollPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm font-medium cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium cursor-pointer"
                   >
                     Lưu điều chỉnh
                   </button>
@@ -506,7 +506,7 @@ export default function PayrollPage() {
                         directorName: directorName.trim() || "Nguyễn Đức Anh",
                       })
                     }
-                    className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Printer className="w-4 h-4" /> In bảng cứng / Xuất PDF
                   </button>

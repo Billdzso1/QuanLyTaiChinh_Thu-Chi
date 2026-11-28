@@ -7,7 +7,7 @@ export interface PermissionSet {
   delete: boolean;
 }
 
-export type RoleKey = "ADMIN" | "ACCOUNTANT" | "SALES" | "IT" | "MARKETING" | "LANDLORD";
+export type RoleKey = "ADMIN" | "ACCOUNTANT" | "SALES" | "IT" | "MARKETING" | "INTERN" | "LANDLORD";
 
 export type ModuleKey =
   | "dashboard"
@@ -49,6 +49,7 @@ export const PERMISSION_ROLES: { key: RoleKey; label: string; desc: string; badg
   { key: "SALES", label: "Sales", desc: "Khách hàng, lịch hẹn & HĐ", badgeClass: "bg-sky-100 text-sky-800 border-sky-300" },
   { key: "IT", label: "IT", desc: "Dự án, task & thiết bị", badgeClass: "bg-violet-100 text-violet-800 border-violet-300" },
   { key: "MARKETING", label: "Marketing", desc: "Chiến dịch & leads", badgeClass: "bg-pink-100 text-pink-800 border-pink-300" },
+  { key: "INTERN", label: "Thực tập sinh", desc: "Nhân sự thực tập (INTERN)", badgeClass: "bg-teal-100 text-teal-800 border-teal-300" },
   { key: "LANDLORD", label: "Chủ trọ", desc: "Phòng, điện nước & cư dân", badgeClass: "bg-neutral-900 text-amber-400 border-amber-500" },
 ];
 
@@ -122,6 +123,19 @@ export function getDefaultPermissionMatrix(): RolePermissionMatrix {
       approvals: { ...VIEW_CREATE },
       it: { ...NONE },
       marketing: { ...VIEW_CREATE_EDIT },
+      employees: { ...NONE },
+      landlord: { ...NONE },
+    },
+    INTERN: {
+      dashboard: { ...NONE },
+      finance: { ...NONE },
+      sales: { ...VIEW_ONLY },
+      rooms: { ...VIEW_ONLY },
+      attendance: { ...VIEW_CREATE },
+      payroll: { ...NONE },
+      approvals: { ...VIEW_ONLY },
+      it: { ...VIEW_ONLY },
+      marketing: { ...VIEW_ONLY },
       employees: { ...NONE },
       landlord: { ...NONE },
     },

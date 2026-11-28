@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, canAccessFinance, UserRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
+import { requirePermission } from "@/lib/permissionsServer";
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "attendance", "view");
+  if (denied) return denied;
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
@@ -37,6 +40,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "attendance", "create");
+  if (denied) return denied;
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
@@ -170,6 +175,8 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "attendance", "edit");
+  if (denied) return denied;
   if (!user || !canAccessFinance(user.role as UserRole)) {
     return NextResponse.json({ error: "Chỉ Kế toán/Giám đốc được xác nhận chấm công" }, { status: 403 });
   }

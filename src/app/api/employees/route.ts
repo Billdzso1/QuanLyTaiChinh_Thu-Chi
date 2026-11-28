@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { notifyInterviewSchedule } from "@/lib/interviewNotify";
+import { requirePermission } from "@/lib/permissionsServer";
 
 interface EmployeeExtraProfile {
   cvUrl?: string | null;
@@ -32,6 +33,8 @@ async function saveExtraProfiles(data: Record<string, EmployeeExtraProfile>) {
 
 export async function GET() {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "employees", "view");
+  if (denied) return denied;
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const [users, departments, extraProfiles] = await Promise.all([
@@ -58,6 +61,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "employees", "create");
+  if (denied) return denied;
   if (!user || user.role !== "ADMIN") {
     return NextResponse.json({ error: "Chỉ Giám đốc mới có quyền thêm nhân sự" }, { status: 403 });
   }
@@ -137,6 +142,8 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "employees", "edit");
+  if (denied) return denied;
   if (!user || user.role !== "ADMIN") {
     return NextResponse.json({ error: "Chỉ Giám đốc mới có quyền cập nhật phân quyền/nhân sự" }, { status: 403 });
   }
@@ -217,6 +224,8 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "employees", "delete");
+  if (denied) return denied;
   if (!user || user.role !== "ADMIN") {
     return NextResponse.json({ error: "Chỉ Giám đốc mới có quyền xóa / từ chối tài khoản" }, { status: 403 });
   }

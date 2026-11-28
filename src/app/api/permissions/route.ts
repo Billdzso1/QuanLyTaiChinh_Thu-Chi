@@ -11,16 +11,17 @@ import {
 const PERMISSIONS_FILE = path.join(process.cwd(), "data", "permissions-matrix.json");
 
 async function readPermissionConfig(): Promise<PermissionConfigData> {
+  const defaults = getDefaultPermissionMatrix();
   try {
     const raw = await readFile(PERMISSIONS_FILE, "utf-8");
     const parsed = JSON.parse(raw) as Partial<PermissionConfigData>;
     return {
-      matrix: parsed.matrix || getDefaultPermissionMatrix(),
+      matrix: { ...defaults, ...(parsed.matrix || {}) },
       userOverrides: parsed.userOverrides || {},
     };
   } catch {
     return {
-      matrix: getDefaultPermissionMatrix(),
+      matrix: defaults,
       userOverrides: {},
     };
   }

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
@@ -96,13 +96,13 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-950 p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border-2 border-amber-500 p-8">
+    <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-cyan-950 p-4 overflow-hidden">
+      <div className="relative z-10 w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_25px_70px_-15px_rgba(79,70,229,0.4)] border border-indigo-200/80 p-8">
         <div className="flex items-center gap-3 mb-6">
           <CompanyLogo size={44} />
           <div>
-            <h1 className="text-xl font-bold text-neutral-950">QUÊN MẬT KHẨU</h1>
-            <p className="text-xs text-neutral-600">Xác minh thông tin &amp; nhận mã OTP qua Gmail</p>
+            <h1 className="text-xl font-extrabold text-slate-900">QUÊN MẬT KHẨU</h1>
+            <p className="text-xs text-slate-500">Xác minh thông tin &amp; nhận mã OTP qua Gmail</p>
           </div>
         </div>
 
@@ -164,7 +164,7 @@ export default function ForgotPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 font-bold text-sm transition-colors disabled:opacity-50 cursor-pointer"
+              className="w-full py-2.5 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 font-bold text-sm transition-colors disabled:opacity-50 cursor-pointer"
             >
               {loading ? "Đang kiểm tra & gửi OTP..." : "Gửi mã OTP về Gmail"}
             </button>
@@ -244,7 +244,7 @@ export default function ForgotPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 font-bold text-sm transition-colors disabled:opacity-50 cursor-pointer"
+              className="w-full py-2.5 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 font-bold text-sm transition-colors disabled:opacity-50 cursor-pointer"
             >
               {loading ? "Đang cập nhật..." : "Xác nhận đổi mật khẩu"}
             </button>
@@ -272,7 +272,7 @@ export default function ForgotPasswordPage() {
             </div>
             <Link
               href="/login"
-              className="w-full py-2.5 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 font-bold text-sm inline-flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 font-bold text-sm inline-flex items-center justify-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" /> Đăng nhập ngay
             </Link>

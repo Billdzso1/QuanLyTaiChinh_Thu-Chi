@@ -116,23 +116,23 @@ export default function DashboardPage() {
     <AppShell>
       <div className="space-y-6 nda-page-enter">
         {/* Executive Hero Header */}
-        <div className="relative overflow-hidden rounded-3xl border border-amber-400/40 bg-[#09090b] p-6 sm:p-7 text-white shadow-xl">
+        <div className="relative overflow-hidden rounded-3xl border border-indigo-400/30 bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-950 p-6 sm:p-7 text-white shadow-xl">
           <div
-            className="pointer-events-none absolute inset-0 opacity-25"
+            className="pointer-events-none absolute inset-0 opacity-35"
             style={{
               backgroundImage:
-                "radial-gradient(circle at 85% 20%, rgba(251,191,36,0.35), transparent 45%), radial-gradient(circle at 15% 85%, rgba(16,185,129,0.2), transparent 45%)",
+                "radial-gradient(circle at 85% 20%, rgba(56,189,248,0.38), transparent 45%), radial-gradient(circle at 15% 85%, rgba(99,102,241,0.35), transparent 45%)",
             }}
           />
           <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-widest text-amber-400 mb-1">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-cyan-300 mb-1">
                 NDAHOME Executive Intelligence
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight bg-gradient-to-r from-white via-amber-100 to-amber-400 bg-clip-text text-transparent">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight bg-gradient-to-r from-white via-sky-100 to-cyan-300 bg-clip-text text-transparent">
                 Dashboard Tổng quan NDAHOME
               </h1>
-              <p className="text-xs sm:text-sm text-neutral-300 mt-1">
+              <p className="text-xs sm:text-sm text-slate-300 mt-1">
                 Theo dõi doanh thu, chi phí, lợi nhuận, ngân sách, bảng vàng KPI và các đầu việc cần phê duyệt
               </p>
             </div>
@@ -274,7 +274,7 @@ export default function DashboardPage() {
                           border: "none",
                           borderRadius: "8px",
                           boxShadow: "0 4px 16px rgba(0, 0, 0, 0.08)",
-                          fontFamily: '"Times New Roman", Times, serif',
+                          fontFamily: '"Segoe UI", Inter, system-ui, sans-serif',
                         }}
                         formatter={(v) => formatVND(Number(v))}
                       />
@@ -315,7 +315,7 @@ export default function DashboardPage() {
                           border: "none",
                           borderRadius: "8px",
                           boxShadow: "0 4px 16px rgba(0, 0, 0, 0.08)",
-                          fontFamily: '"Times New Roman", Times, serif',
+                          fontFamily: '"Segoe UI", Inter, system-ui, sans-serif',
                         }}
                         formatter={(v) => formatVND(Number(v))}
                       />
@@ -345,7 +345,7 @@ export default function DashboardPage() {
                           border: "none",
                           borderRadius: "8px",
                           boxShadow: "0 4px 16px rgba(0, 0, 0, 0.08)",
-                          fontFamily: '"Times New Roman", Times, serif',
+                          fontFamily: '"Segoe UI", Inter, system-ui, sans-serif',
                         }}
                         formatter={(v) => formatVND(Number(v))}
                       />
@@ -372,7 +372,7 @@ export default function DashboardPage() {
                           border: "none",
                           borderRadius: "8px",
                           boxShadow: "0 4px 16px rgba(0, 0, 0, 0.08)",
-                          fontFamily: '"Times New Roman", Times, serif',
+                          fontFamily: '"Segoe UI", Inter, system-ui, sans-serif',
                         }}
                         formatter={(v) => formatVND(Number(v))}
                       />

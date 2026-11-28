@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, canAccessFinance, UserRole } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { readContractSplits, allocateContractRevenue } from "@/lib/contractSplits";
+import { requirePermission } from "@/lib/permissionsServer";
 
 export async function GET() {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "dashboard", "view");
+  if (denied) return denied;
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canAccessFinance(user.role as UserRole)) {
-    return NextResponse.json(
-      { error: "Chỉ Giám đốc và Kế toán mới được xem Dashboard Tổng quan" },
-      { status: 403 }
-    );
-  }
 
   const [
     transactions,

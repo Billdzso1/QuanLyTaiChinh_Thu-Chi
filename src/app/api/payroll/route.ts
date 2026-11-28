@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { calculateSalesCommission, generateCode } from "@/lib/finance";
 import { readContractSplits, allocateContractRevenue } from "@/lib/contractSplits";
 import { logAudit } from "@/lib/audit";
+import { requirePermission } from "@/lib/permissionsServer";
 
 const PAYROLL_DOCS_FILE = path.join(process.cwd(), "data", "payroll-docs.json");
 
@@ -33,6 +34,10 @@ export async function GET(request: Request) {
   const month = Number(searchParams.get("month")) || 11;
   const year = Number(searchParams.get("year")) || 2026;
   const scope = searchParams.get("scope");
+  if (scope === "all") {
+    const denied = await requirePermission(user, "payroll", "view");
+    if (denied) return denied;
+  }
 
   const canViewAll = scope === "all" && canAccessFinance(user.role as UserRole);
   const where: Record<string, unknown> = { month, year };
@@ -63,6 +68,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "payroll", "create");
+  if (denied) return denied;
   if (!user || !canAccessFinance(user.role as UserRole)) {
     return NextResponse.json({ error: "Chỉ Kế toán/Giám đốc được tính bảng lương" }, { status: 403 });
   }
@@ -150,6 +157,8 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "payroll", "edit");
+  if (denied) return denied;
   if (!user || !canAccessFinance(user.role as UserRole)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

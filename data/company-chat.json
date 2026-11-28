@@ -1,0 +1,39 @@
+{
+  "messages": [
+    {
+      "id": "welcome-msg-1",
+      "channelId": "GENERAL",
+      "senderId": "system",
+      "senderName": "Hệ thống NDAHOME",
+      "senderCode": "SYS",
+      "senderRole": "ADMIN",
+      "senderDept": "Ban Giám đốc",
+      "senderEmpType": "FULL_TIME",
+      "text": "Chào mừng toàn thể nhân sự NDAHOME đến với Nhóm Trao Đổi Nội Bộ! Mọi phòng ban có thể trao đổi công việc, gửi ảnh và thả cảm xúc tại đây.",
+      "reactions": {
+        "🎉": [],
+        "👍": []
+      },
+      "createdAt": "2026-11-28T03:55:58.172Z"
+    },
+    {
+      "id": "msg-1795838158172-4693",
+      "channelId": "GENERAL",
+      "senderId": "cmwypvmf20006qi5sk4nr1qan",
+      "senderName": "Nguyễn Đức Anh",
+      "senderCode": "NDA-001",
+      "senderRole": "ADMIN",
+      "senderDept": "Ban Giám đốc",
+      "senderEmpType": "FULL_TIME",
+      "senderAvatar": null,
+      "text": "hi",
+      "imageUrl": null,
+      "reactions": {},
+      "createdAt": "2026-11-28T03:55:58.172Z"
+    }
+  ],
+  "moderation": {
+    "mutedUntil": {},
+    "kicked": {}
+  }
+}

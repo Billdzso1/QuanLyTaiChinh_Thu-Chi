@@ -249,7 +249,7 @@ export default function FinancePage() {
             </button>
             <button
               onClick={() => setShowModal(true)}
-              className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium inline-flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Ghi nhận Thu / Chi
             </button>
@@ -291,7 +291,7 @@ export default function FinancePage() {
                 key={tab.key}
                 onClick={() => setFilterType(tab.key)}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer ${filterType === tab.key
-                  ? "bg-neutral-950 text-amber-400 border border-amber-500"
+                  ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20"
                   : "bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
                   }`}
               >
@@ -495,7 +495,7 @@ export default function FinancePage() {
                     Hóa đơn / Chứng từ (Tự động quét &amp; thêm vào hệ thống)
                   </label>
                   <div className="flex flex-wrap items-center gap-2">
-                    <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-xs font-medium cursor-pointer">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-medium cursor-pointer">
                       <Camera className="w-3.5 h-3.5" />
                       {scanningSmart || uploadingVoucher ? "Đang quét..." : "Scan / Chụp ảnh"}
                       <input
@@ -550,7 +550,7 @@ export default function FinancePage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm font-medium cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium cursor-pointer"
                   >
                     Lưu giao dịch
                   </button>

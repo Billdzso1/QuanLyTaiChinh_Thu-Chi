@@ -212,7 +212,7 @@ export default function AttendancePage() {
             </button>
             <button
               onClick={() => handleClock("CHECK_OUT")}
-              className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium inline-flex items-center gap-1.5 cursor-pointer"
             >
               <LogOut className="w-4 h-4" /> Chấm công Ra
             </button>
@@ -224,14 +224,14 @@ export default function AttendancePage() {
             </button>
             <button
               onClick={() => setShowAdjModal(true)}
-              className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-neutral-950 text-sm font-bold inline-flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-600 hover:to-sky-600 text-white shadow-sm shadow-cyan-500/20 text-sm font-bold inline-flex items-center gap-1.5 cursor-pointer"
             >
               <Clock className="w-4 h-4" /> Sửa giờ công
             </button>
             {user?.role === "ADMIN" && (
               <button
                 onClick={() => setShowAdminMarkModal(true)}
-                className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <UserCheck className="w-4 h-4" /> Chấm công nhân sự
               </button>
@@ -246,14 +246,14 @@ export default function AttendancePage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setScope("personal")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer ${scope === "personal" ? "bg-neutral-950 text-amber-400 border border-amber-500" : "bg-neutral-100 text-neutral-700"
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer ${scope === "personal" ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20" : "bg-neutral-100 text-neutral-700"
                   }`}
               >
                 Chấm công cá nhân
               </button>
               <button
                 onClick={() => setScope("all")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer ${scope === "all" ? "bg-neutral-950 text-amber-400 border border-amber-500" : "bg-neutral-100 text-neutral-700"
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer ${scope === "all" ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20" : "bg-neutral-100 text-neutral-700"
                   }`}
               >
                 Toàn công ty (16 nhân sự)
@@ -497,7 +497,7 @@ export default function AttendancePage() {
                   <button type="button" onClick={() => setShowAdjModal(false)} className="px-4 py-2 rounded-lg border text-sm cursor-pointer">
                     Hủy
                   </button>
-                  <button type="submit" className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm cursor-pointer">
+                  <button type="submit" className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm cursor-pointer">
                     Gửi yêu cầu
                   </button>
                 </div>
@@ -585,7 +585,7 @@ export default function AttendancePage() {
                   <button type="button" onClick={() => setShowAdminMarkModal(false)} className="px-4 py-2 rounded-lg border text-sm cursor-pointer">
                     Hủy
                   </button>
-                  <button type="submit" className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm cursor-pointer">
+                  <button type="submit" className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm cursor-pointer">
                     Lưu chấm công
                   </button>
                 </div>
@@ -645,7 +645,7 @@ export default function AttendancePage() {
                 <div>
                   <label className="block text-xs font-medium mb-1">Hình ảnh minh chứng (giấy khám, lịch thi/học...)</label>
                   <div className="flex items-center gap-3">
-                    <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-950 text-amber-400 text-xs font-medium cursor-pointer">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 text-white shadow-sm text-xs font-medium cursor-pointer">
                       <Upload className="w-3.5 h-3.5" />
                       {uploadingEvidence ? "Đang tải..." : "Tải ảnh minh chứng"}
                       <input type="file" accept="image/*" onChange={handleEvidenceUpload} className="hidden" />
@@ -667,7 +667,7 @@ export default function AttendancePage() {
                   >
                     Hủy
                   </button>
-                  <button type="submit" className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm cursor-pointer">
+                  <button type="submit" className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm cursor-pointer">
                     Gửi đơn
                   </button>
                 </div>

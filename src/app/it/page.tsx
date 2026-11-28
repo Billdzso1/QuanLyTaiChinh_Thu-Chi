@@ -15,6 +15,7 @@ export default function ITPage() {
   }>({ projects: [], tasks: [], devices: [], users: [] });
 
   const [showProjectModal, setShowProjectModal] = useState(false);
+  const [canCreateIt, setCanCreateIt] = useState(true);
   const [creating, setCreating] = useState(false);
   const [msg, setMsg] = useState("");
   const [projectForm, setProjectForm] = useState({
@@ -25,7 +26,13 @@ export default function ITPage() {
   });
 
   async function loadData() {
-    const res = await fetch("/api/departments/it");
+    const [res, meRes] = await Promise.all([fetch("/api/departments/it"), fetch("/api/auth/me")]);
+    if (meRes.ok) {
+      const me = await meRes.json();
+      if (me?.user?.permissions?.it) {
+        setCanCreateIt(Boolean(me.user.permissions.it.create));
+      }
+    }
     if (res.ok) {
       const d = await res.json();
       setData(d);
@@ -82,12 +89,14 @@ export default function ITPage() {
             <h1 className="text-2xl font-bold text-neutral-900">Phòng IT — Dự án, Công việc & Thiết bị</h1>
             <p className="text-sm text-neutral-500">Quản lý tiến độ dự án công nghệ, công việc nhóm IT và tài sản thiết bị công ty</p>
           </div>
-          <button
-            onClick={() => setShowProjectModal(true)}
-            className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-2 cursor-pointer self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" /> Tạo dự án công nghệ mới
-          </button>
+          {canCreateIt && (
+            <button
+              onClick={() => setShowProjectModal(true)}
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium inline-flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" /> Tạo dự án công nghệ mới
+            </button>
+          )}
         </div>
 
         {msg && (
@@ -254,7 +263,7 @@ export default function ITPage() {
                   <button
                     type="submit"
                     disabled={creating}
-                    className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm font-medium cursor-pointer disabled:opacity-50"
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium cursor-pointer disabled:opacity-50"
                   >
                     {creating ? "Đang tạo..." : "Tạo dự án"}
                   </button>

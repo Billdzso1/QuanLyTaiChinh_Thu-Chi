@@ -269,7 +269,7 @@ export default function LandlordUtilitiesPage() {
             <button
               type="button"
               onClick={() => setShowBankConfig(false)}
-              className="px-4 py-1.5 rounded-lg bg-neutral-950 text-amber-400 font-bold cursor-pointer"
+              className="px-4 py-1.5 rounded-lg bg-indigo-600 text-white shadow-sm font-bold cursor-pointer"
             >
               Xong
             </button>
@@ -699,7 +699,7 @@ export default function LandlordUtilitiesPage() {
                   <button
                     type="button"
                     onClick={() => printUtilityBillPdf(previewBill)}
-                    className="px-3.5 py-1.5 rounded-xl bg-neutral-950 text-amber-400 border border-amber-500 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Printer className="w-3.5 h-3.5" /> In / Lưu PDF gửi Zalo
                   </button>

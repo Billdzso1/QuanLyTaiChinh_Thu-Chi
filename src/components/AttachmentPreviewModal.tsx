@@ -49,7 +49,7 @@ export function AttachmentPreviewModal({ url, title = "Xem chứng từ / Tệp 
             <a
               href={url}
               download
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-xs font-medium"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-medium"
             >
               <Download className="w-3.5 h-3.5" /> Tải xuống
             </a>
@@ -76,7 +76,7 @@ export function AttachmentPreviewModal({ url, title = "Xem chứng từ / Tệp 
             <a
               href={url}
               download
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-xs font-medium"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-medium"
             >
               <Download className="w-4 h-4" /> Tải tệp về máy
             </a>

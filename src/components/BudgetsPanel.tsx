@@ -148,7 +148,7 @@ export function BudgetsPanel() {
               });
               setShowModal(true);
             }}
-            className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-2 cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium inline-flex items-center gap-2 cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Đề xuất ngân sách mới
           </button>
@@ -364,7 +364,7 @@ export function BudgetsPanel() {
                   >
                     Hủy
                   </button>
-                  <button type="submit" className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm cursor-pointer">
+                  <button type="submit" className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm cursor-pointer">
                     {editingRequestId ? "Lưu thay đổi" : "Gửi đề xuất"}
                   </button>
                 </div>

@@ -3,12 +3,15 @@ import bcrypt from "bcryptjs";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
+import { getEffectivePermissions } from "@/lib/permissionsServer";
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const permissions = await getEffectivePermissions(user.id, user.role, user.employmentType);
 
   return NextResponse.json({
     user: {
@@ -27,6 +30,7 @@ export async function GET() {
       kpiTarget: user.kpiTarget,
       joinedAt: user.joinedAt,
       department: user.department,
+      permissions,
     },
   });
 }

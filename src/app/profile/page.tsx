@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import { AppShell, CurrentUser } from "@/components/AppShell";
@@ -200,7 +200,7 @@ export default function ProfilePage() {
               {pwMsg && <div className="text-xs font-medium text-amber-700">{pwMsg}</div>}
               <button
                 type="submit"
-                className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium cursor-pointer"
+                className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium cursor-pointer"
               >
                 Cập nhật mật khẩu
               </button>
@@ -220,7 +220,7 @@ export default function ProfilePage() {
               </div>
               <div className="flex-1 space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium cursor-pointer">
+                  <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium cursor-pointer">
                     <Upload className="w-4 h-4" /> Tải tệp ảnh từ máy
                     <input type="file" accept="image/*" onChange={handleUploadLogoFile} className="hidden" />
                   </label>
@@ -243,7 +243,7 @@ export default function ProfilePage() {
                   <button
                     type="button"
                     onClick={() => handleSaveLogoUrl(logoInputUrl)}
-                    className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold text-sm cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-600 hover:to-sky-600 text-white shadow-sm shadow-cyan-500/20 font-bold text-sm cursor-pointer"
                   >
                     Lưu Link
                   </button>

@@ -85,6 +85,9 @@ export default function SalesPage() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [salesStats, setSalesStats] = useState<Record<string, { contractCount: number; revenue: number }>>({});
   const [currentUserRole, setCurrentUserRole] = useState<string>("");
+  const [userPermissions, setUserPermissions] = useState<
+    Record<string, { view?: boolean; create?: boolean; edit?: boolean; delete?: boolean }> | null
+  >(null);
   interface RoomContractInfo {
     id: string;
     contractCode: string;
@@ -296,6 +299,7 @@ export default function SalesPage() {
     if (meRes.ok) {
       const meData = await meRes.json();
       setCurrentUserRole(meData.user?.role || "");
+      setUserPermissions(meData.user?.permissions || null);
     }
     if (cRes.ok) {
       const d = await cRes.json();
@@ -737,18 +741,22 @@ export default function SalesPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setShowCustomerModal(true)}
-              className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-neutral-950 text-sm font-bold inline-flex items-center gap-2 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" /> Tạo Khách hàng mới
-            </button>
-            <button
-              onClick={() => setShowContractModal(true)}
-              className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-2 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" /> Tạo Hợp đồng mới
-            </button>
+            {(userPermissions ? Boolean(userPermissions.sales?.create) : true) && (
+              <>
+                <button
+                  onClick={() => setShowCustomerModal(true)}
+                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-600 hover:to-sky-600 text-white shadow-sm shadow-cyan-500/20 text-sm font-bold inline-flex items-center gap-2 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" /> Tạo Khách hàng mới
+                </button>
+                <button
+                  onClick={() => setShowContractModal(true)}
+                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium inline-flex items-center gap-2 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" /> Tạo Hợp đồng mới
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -787,7 +795,7 @@ export default function SalesPage() {
               onClick={() => setTab(t.id as typeof tab)}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer ${
                 tab === t.id
-                  ? "bg-neutral-950 text-amber-400 border border-amber-500"
+                  ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20"
                   : "bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
               }`}
             >
@@ -909,7 +917,7 @@ export default function SalesPage() {
                           <button
                             type="button"
                             onClick={() => setSelectedContract(c)}
-                            className="px-2.5 py-1 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-xs font-medium cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-medium cursor-pointer"
                           >
                             Xem chi tiết
                           </button>
@@ -1080,23 +1088,25 @@ export default function SalesPage() {
                             Xóa bộ lọc
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingPropertyId(null);
-                            setPropertyForm({
-                              name: "",
-                              district: roomDistrict !== "ALL" ? roomDistrict : "Bình Thạnh",
-                              address: "",
-                              landlordName: "",
-                              landlordPhone: "",
-                            });
-                            setShowPropertyModal(true);
-                          }}
-                          className="px-3.5 py-2 rounded-lg bg-white hover:bg-amber-50 text-neutral-900 border border-amber-400 font-semibold text-xs inline-flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Building className="w-4 h-4 text-amber-600" /> + Thêm Khu vực
-                        </button>
+                        {(userPermissions ? Boolean(userPermissions.rooms?.create) : true) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingPropertyId(null);
+                              setPropertyForm({
+                                name: "",
+                                district: roomDistrict !== "ALL" ? roomDistrict : "Bình Thạnh",
+                                address: "",
+                                landlordName: "",
+                                landlordPhone: "",
+                              });
+                              setShowPropertyModal(true);
+                            }}
+                            className="px-3.5 py-2 rounded-lg bg-white hover:bg-amber-50 text-neutral-900 border border-amber-400 font-semibold text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Building className="w-4 h-4 text-amber-600" /> + Thêm Khu vực
+                          </button>
+                        )}
                         {roomPropertyFilter !== "ALL" && (() => {
                           const selectedProp = crm.properties.find((p) => p.id === roomPropertyFilter);
                           if (!selectedProp) return null;
@@ -1131,12 +1141,14 @@ export default function SalesPage() {
                             </>
                           );
                         })()}
-                        <button
-                          onClick={() => setShowRoomModal(true)}
-                          className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Plus className="w-4 h-4" /> Thêm Phòng / Nhà
-                        </button>
+                        {(userPermissions ? Boolean(userPermissions.rooms?.create) : true) && (
+                          <button
+                            onClick={() => setShowRoomModal(true)}
+                            className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-600 hover:to-sky-600 text-white shadow-sm shadow-cyan-500/20 font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Plus className="w-4 h-4" /> Thêm Phòng / Nhà
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -1473,19 +1485,21 @@ export default function SalesPage() {
                           <span>Chưa có ảnh phòng</span>
                         </div>
                       )}
-                      <label
-                        onClick={(e) => e.stopPropagation()}
-                        className="absolute bottom-2 right-2 px-2.5 py-1 rounded-md bg-neutral-950/85 hover:bg-neutral-950 text-amber-400 text-[11px] font-medium inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <Upload className="w-3 h-3" /> {r.imageUrl ? "Đổi ảnh" : "Tải ảnh"}
-                        <input type="file" accept="image/*" onChange={(e) => handleQuickRoomImage(r.id, e)} className="hidden" />
-                      </label>
+                      {(userPermissions ? Boolean(userPermissions.rooms?.edit) : true) && (
+                        <label
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute bottom-2 right-2 px-2.5 py-1 rounded-md bg-neutral-950/85 hover:bg-indigo-600 text-white shadow-sm text-[11px] font-medium inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Upload className="w-3 h-3" /> {r.imageUrl ? "Đổi ảnh" : "Tải ảnh"}
+                          <input type="file" accept="image/*" onChange={(e) => handleQuickRoomImage(r.id, e)} className="hidden" />
+                        </label>
+                      )}
                       <span
                         className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-medium ${
                           r.status === "AVAILABLE"
                             ? "bg-emerald-100 text-emerald-700"
                             : r.status === "RENTED"
-                            ? "bg-neutral-950 text-amber-400"
+                            ? "bg-indigo-600 text-white shadow-sm"
                             : r.status === "MAINTENANCE"
                             ? "bg-rose-100 text-rose-700"
                             : "bg-amber-100 text-amber-800"
@@ -1731,7 +1745,7 @@ export default function SalesPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm font-medium cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium cursor-pointer"
                   >
                     Lưu hợp đồng
                   </button>
@@ -1898,7 +1912,7 @@ export default function SalesPage() {
                   />
                 </div>
                 <div className="flex items-center gap-3">
-                  <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-950 text-amber-400 text-xs font-medium cursor-pointer">
+                  <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 text-white shadow-sm text-xs font-medium cursor-pointer">
                     <Upload className="w-3.5 h-3.5" />
                     {uploadingRoomImg ? "Đang tải..." : "Tải ảnh phòng"}
                     <input
@@ -1928,7 +1942,7 @@ export default function SalesPage() {
                   <button type="button" onClick={() => setShowRoomModal(false)} className="px-4 py-2 rounded-lg border text-sm cursor-pointer">
                     Hủy
                   </button>
-                  <button type="submit" className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm cursor-pointer">
+                  <button type="submit" className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm cursor-pointer">
                     Lưu phòng
                   </button>
                 </div>
@@ -1952,7 +1966,7 @@ export default function SalesPage() {
                         selectedRoom.status === "AVAILABLE"
                           ? "bg-emerald-100 text-emerald-700"
                           : selectedRoom.status === "RENTED"
-                          ? "bg-neutral-950 text-amber-400"
+                          ? "bg-indigo-600 text-white shadow-sm"
                           : selectedRoom.status === "MAINTENANCE"
                           ? "bg-rose-100 text-rose-700"
                           : "bg-amber-100 text-amber-800"
@@ -2095,7 +2109,7 @@ export default function SalesPage() {
                     <button type="button" onClick={() => setEditingRoom(false)} className="px-3 py-1.5 rounded-lg border text-xs bg-white cursor-pointer">
                       Hủy
                     </button>
-                    <button type="submit" className="px-3.5 py-1.5 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-xs font-bold cursor-pointer">
+                    <button type="submit" className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-bold cursor-pointer">
                       Lưu thay đổi
                     </button>
                   </div>
@@ -2148,7 +2162,7 @@ export default function SalesPage() {
                     )}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-xs font-medium"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-medium"
                   >
                     <MapPin className="w-3.5 h-3.5" /> Chỉ đường Google Maps <ExternalLink className="w-3 h-3" />
                   </a>
@@ -2279,7 +2293,7 @@ export default function SalesPage() {
                           <div className="flex items-center gap-2 font-bold text-xs text-neutral-900">
                             <FileText className="w-4 h-4 text-amber-600" /> File PDF hóa đơn / Chứng từ minh chứng
                           </div>
-                          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-xs font-medium cursor-pointer">
+                          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-medium cursor-pointer">
                             <Upload className="w-3.5 h-3.5" />
                             {uploadingInvoice ? "Đang tải..." : ct.invoiceUrl ? "Đổi file PDF" : "Tải file PDF hóa đơn"}
                             <input
@@ -2345,7 +2359,7 @@ export default function SalesPage() {
                         setSelectedRoom(null);
                         openViewingModalForRoom(rid);
                       }}
-                      className="px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-neutral-950 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                      className="px-3.5 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-600 hover:to-sky-600 text-white shadow-sm shadow-cyan-500/20 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                     >
                       <CalendarPlus className="w-3.5 h-3.5" /> Đặt lịch xem phòng
                     </button>
@@ -2360,7 +2374,7 @@ export default function SalesPage() {
                         setSelectedRoom(null);
                         setShowContractModal(true);
                       }}
-                      className="px-3.5 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-xs font-bold cursor-pointer"
+                      className="px-3.5 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-bold cursor-pointer"
                     >
                       + Tạo hợp đồng / đặt cọc
                     </button>
@@ -2652,7 +2666,7 @@ export default function SalesPage() {
                     </button>
                     <button
                       type="submit"
-                      className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-neutral-950 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                      className="px-5 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-600 hover:to-sky-600 text-white shadow-sm shadow-cyan-500/20 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                     >
                       <CalendarPlus className="w-4 h-4" />
                       {isSelf100 ? "Xác nhận đặt lịch (100% HH)" : "Xác nhận đặt lịch (50% / 50%)"}
@@ -2837,7 +2851,7 @@ export default function SalesPage() {
                   <button
                     type="button"
                     onClick={() => printDepositReceiptPdf(receiptModalData)}
-                    className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Printer className="w-4 h-4" /> Tải / In Hóa đơn PDF
                   </button>
@@ -3265,7 +3279,7 @@ export default function SalesPage() {
                   <button type="button" onClick={() => setShowPropertyModal(false)} className="px-4 py-2 rounded-lg border text-sm cursor-pointer">
                     Hủy
                   </button>
-                  <button type="submit" className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm font-bold cursor-pointer">
+                  <button type="submit" className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-bold cursor-pointer">
                     Lưu khu vực
                   </button>
                 </div>
@@ -3365,7 +3379,7 @@ export default function SalesPage() {
                   <button type="button" onClick={() => setShowCustomerModal(false)} className="px-4 py-2 rounded-lg border text-sm cursor-pointer">
                     Hủy
                   </button>
-                  <button type="submit" className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm cursor-pointer">
+                  <button type="submit" className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm cursor-pointer">
                     Tạo khách hàng
                   </button>
                 </div>
@@ -3465,7 +3479,7 @@ export default function SalesPage() {
                   <button type="button" onClick={() => setEditingCustomerId(null)} className="px-4 py-2 rounded-lg border text-sm cursor-pointer">
                     Hủy
                   </button>
-                  <button type="submit" className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm cursor-pointer">
+                  <button type="submit" className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm cursor-pointer">
                     Lưu thông tin
                   </button>
                 </div>

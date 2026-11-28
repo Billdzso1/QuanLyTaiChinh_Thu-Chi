@@ -460,7 +460,7 @@ export default function EmployeesPage() {
                   onClick={() => setMainTab("EMPLOYEES")}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 ${
                     mainTab === "EMPLOYEES"
-                      ? "bg-neutral-950 text-amber-400 shadow-sm"
+                      ? "bg-indigo-600 text-white shadow-sm shadow-sm"
                       : "text-neutral-600 hover:text-neutral-900"
                   }`}
                 >
@@ -470,7 +470,7 @@ export default function EmployeesPage() {
                   onClick={() => setMainTab("PERMISSIONS")}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 ${
                     mainTab === "PERMISSIONS"
-                      ? "bg-neutral-950 text-amber-400 shadow-sm"
+                      ? "bg-indigo-600 text-white shadow-sm shadow-sm"
                       : "text-neutral-600 hover:text-neutral-900"
                   }`}
                 >
@@ -480,7 +480,7 @@ export default function EmployeesPage() {
             )}
             <button
               onClick={() => setShowModal(true)}
-              className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium inline-flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Thêm nhân sự / Thực tập sinh
             </button>
@@ -518,7 +518,7 @@ export default function EmployeesPage() {
                   type="button"
                   disabled={savingPerms}
                   onClick={() => savePermissions()}
-                  className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-neutral-950 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-600 hover:to-sky-600 text-white shadow-sm shadow-cyan-500/20 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <Save className="w-3.5 h-3.5" /> {savingPerms ? "Đang lưu..." : "Lưu cấu hình phân quyền"}
                 </button>
@@ -771,7 +771,7 @@ export default function EmployeesPage() {
                 onClick={() => setTypeFilter(t.key as typeof typeFilter)}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer ${
                   typeFilter === t.key
-                    ? "bg-neutral-950 text-amber-400 border border-amber-500"
+                    ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20"
                     : "bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50"
                 }`}
               >
@@ -821,7 +821,7 @@ export default function EmployeesPage() {
                               className="w-10 h-10 rounded-full object-cover border border-amber-500/60"
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-full bg-neutral-950 text-amber-400 flex items-center justify-center font-bold text-xs border border-amber-500/40">
+                            <div className="w-10 h-10 rounded-full bg-indigo-600 text-white shadow-sm flex items-center justify-center font-bold text-xs border border-amber-500/40">
                               {u.fullName.split(" ").slice(-1)[0]?.[0] || "N"}
                             </div>
                           )}
@@ -931,23 +931,46 @@ export default function EmployeesPage() {
                       <div className="text-neutral-400">{u.position}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-col gap-1 items-start">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 text-amber-700 text-xs font-medium">
-                          <Shield className="w-3 h-3" /> {ROLE_VI_LABELS[u.role] || u.role}
-                        </span>
+                      <div className="flex flex-col gap-1.5 items-start">
+                        {(() => {
+                          const roleClsMap: Record<string, string> = {
+                            ADMIN: "bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-2xs",
+                            ACCOUNTANT: "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-2xs",
+                            SALES: "bg-gradient-to-r from-sky-500 to-cyan-600 text-white shadow-2xs",
+                            IT: "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-2xs",
+                            MARKETING: "bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-2xs",
+                            LANDLORD: "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-2xs",
+                          };
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-transform duration-200 hover:scale-105 ${
+                                roleClsMap[u.role] || "bg-slate-700 text-white"
+                              }`}
+                            >
+                              <Shield className="w-3 h-3" /> {ROLE_VI_LABELS[u.role] || u.role}
+                            </span>
+                          );
+                        })()}
                         <button
                           onClick={() => toggleTeamLead(u)}
-                          className={`px-2 py-0.5 rounded text-[11px] font-medium cursor-pointer ${
-                            u.isTeamLead ? "bg-emerald-100 text-emerald-700" : "bg-neutral-100 text-neutral-500"
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-semibold transition-all hover:scale-105 cursor-pointer ${
+                            u.isTeamLead
+                              ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                           }`}
                         >
-                          {u.isTeamLead ? "Phụ trách nhóm" : "Thành viên"}
+                          {u.isTeamLead ? "★ Phụ trách nhóm" : "Thành viên"}
                         </button>
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                             u.isActive ? "bg-emerald-50 text-emerald-700" : "bg-rose-100 text-rose-700"
                           }`}
                         >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              u.isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                            }`}
+                          />
                           {u.isActive ? "Đang hoạt động" : "Đã khóa / Chờ duyệt"}
                         </span>
                       </div>
@@ -1015,7 +1038,7 @@ export default function EmployeesPage() {
                       Ảnh
                     </div>
                   )}
-                  <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-neutral-950 text-amber-400 text-xs font-medium cursor-pointer">
+                  <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 text-white shadow-sm text-xs font-medium cursor-pointer">
                     <Upload className="w-3.5 h-3.5" />
                     {uploadingAvatar ? "Đang tải..." : "Tải ảnh nhân sự"}
                     <input type="file" accept="image/*" onChange={handleFormAvatarUpload} className="hidden" />
@@ -1227,7 +1250,7 @@ export default function EmployeesPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm cursor-pointer"
                   >
                     Tạo tài khoản
                   </button>
@@ -1246,7 +1269,7 @@ export default function EmployeesPage() {
                   {detailUser.avatar ? (
                     <img src={detailUser.avatar} alt={detailUser.fullName} className="w-11 h-11 rounded-full object-cover border border-amber-500" />
                   ) : (
-                    <div className="w-11 h-11 rounded-full bg-neutral-950 text-amber-400 flex items-center justify-center font-bold">
+                    <div className="w-11 h-11 rounded-full bg-indigo-600 text-white shadow-sm flex items-center justify-center font-bold">
                       {detailUser.fullName.split(" ").slice(-1)[0]?.[0] || "N"}
                     </div>
                   )}
@@ -1401,7 +1424,9 @@ export default function EmployeesPage() {
               {/* Module List */}
               <div className="p-4 sm:p-5 max-h-[58vh] overflow-y-auto space-y-2.5 bg-neutral-50/50">
                 {PERMISSION_MODULES.map((m) => {
-                  const roleKey = (permUserModal.role as RoleKey) || "SALES";
+                  const roleKey = (
+                    permUserModal.employmentType === "INTERN" ? "INTERN" : permUserModal.role || "SALES"
+                  ) as RoleKey;
                   const cell =
                     userOverrides[permUserModal.id]?.[m.key] ||
                     permMatrix[roleKey]?.[m.key] || { view: false, create: false, edit: false, delete: false };
@@ -1517,7 +1542,7 @@ export default function EmployeesPage() {
                       await savePermissions(permUserModal.id);
                       setPermUserModal(null);
                     }}
-                    className="px-5 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    className="px-5 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     <Save className="w-3.5 h-3.5" /> {savingPerms ? "Đang lưu..." : "Lưu quyền nhân sự"}
                   </button>

@@ -3,6 +3,7 @@ import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requirePermission } from "@/lib/permissionsServer";
 
 export interface UtilityBillRecord {
   id: string;
@@ -96,7 +97,9 @@ async function writeJsonArray<T>(filePath: string, data: T[]) {
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user || user.role !== "LANDLORD") {
+  const denied = await requirePermission(user, "landlord", "view");
+  if (denied) return denied;
+  if (!user) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -121,7 +124,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
-  if (!user || user.role !== "LANDLORD") {
+  const denied = await requirePermission(user, "landlord", "create");
+  if (denied) return denied;
+  if (!user) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

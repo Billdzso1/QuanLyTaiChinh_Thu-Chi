@@ -3,6 +3,7 @@ import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { hasPermission, requirePermission } from "@/lib/permissionsServer";
 
 interface RoomViewingRecord {
   id: string;
@@ -62,13 +63,17 @@ function maskIdCard(idCard?: string | null): string | null {
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const canView =
+    (await hasPermission(user.id, user.role, "sales", "view", user.employmentType)) ||
+    (await hasPermission(user.id, user.role, "rooms", "view", user.employmentType));
+  if (!canView) {
+    return NextResponse.json({ error: "Bạn không có quyền xem phân hệ Sales / Phòng." }, { status: 403 });
+  }
 
   const isSales = user.role === "SALES";
-  const customerWhere = isSales ? { salesId: user.id } : {};
 
   const [customers, properties, rooms, salesUsers, viewings] = await Promise.all([
     prisma.customer.findMany({
-      where: customerWhere,
       include: { sales: { select: { id: true, fullName: true } } },
       orderBy: { createdAt: "desc" },
     }),
@@ -97,11 +102,15 @@ export async function GET() {
   ]);
 
   if (isSales) {
-    const safeCustomers = customers.map((c) => ({
-      ...c,
-      email: null,
-      idCard: maskIdCard(c.idCard),
-    }));
+    const safeCustomers = customers.map((c) => {
+      const isMine = c.salesId === user.id;
+      return {
+        ...c,
+        phone: isMine ? c.phone : maskPhone(c.phone),
+        email: null,
+        idCard: maskIdCard(c.idCard),
+      };
+    });
     const safeRooms = rooms.map((r) => ({
       ...r,
       contracts: r.contracts.map((ct) => {
@@ -118,9 +127,13 @@ export async function GET() {
         };
       }),
     }));
-    const safeViewings = viewings.filter(
-      (v) => v.salesId === user.id || v.onlineSalesId === user.id
-    );
+    const safeViewings = viewings.map((v) => {
+      const isMine = v.salesId === user.id || v.onlineSalesId === user.id;
+      return {
+        ...v,
+        customerPhone: isMine ? v.customerPhone : maskPhone(v.customerPhone),
+      };
+    });
     return NextResponse.json({
       customers: safeCustomers,
       properties,
@@ -138,6 +151,9 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
+  const targetModule = body.entity === "PROPERTY" || body.entity === "ROOM" ? "rooms" : "sales";
+  const denied = await requirePermission(user, targetModule, "create");
+  if (denied) return denied;
 
   if (body.entity === "CUSTOMER") {
     const customer = await prisma.customer.create({
@@ -309,6 +325,9 @@ export async function PATCH(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
+  const targetModule = body.entity === "ROOM" || body.entity === "PROPERTY" ? "rooms" : "sales";
+  const denied = await requirePermission(user, targetModule, "edit");
+  if (denied) return denied;
   if (body.entity === "ROOM") {
     const room = await prisma.room.update({
       where: { id: body.id },

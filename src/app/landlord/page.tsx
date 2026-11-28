@@ -565,7 +565,7 @@ export default function LandlordPortalPage() {
             <button
               type="button"
               onClick={() => setTab("PAYOUTS")}
-              className="px-3.5 py-1.5 rounded-xl bg-neutral-950 text-amber-400 font-bold cursor-pointer hover:bg-neutral-800 transition"
+              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white shadow-sm font-bold cursor-pointer hover:bg-neutral-800 transition"
             >
               Xem hợp đồng
             </button>
@@ -590,7 +590,7 @@ export default function LandlordPortalPage() {
                   onClick={() => setTab(t.id as typeof tab)}
                   className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     active
-                      ? "bg-neutral-950 text-amber-400 shadow-md"
+                      ? "bg-indigo-600 text-white shadow-sm shadow-md"
                       : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
                   }`}
                 >
@@ -777,7 +777,7 @@ export default function LandlordPortalPage() {
                                     landlordPhone: r.landlordPhone,
                                   })
                                 }
-                                className="shrink-0 px-2.5 py-1 rounded-lg bg-neutral-950 text-amber-400 font-bold hover:bg-neutral-800 inline-flex items-center gap-1 cursor-pointer transition"
+                                className="shrink-0 px-2.5 py-1 rounded-lg bg-indigo-600 text-white shadow-sm font-bold hover:bg-neutral-800 inline-flex items-center gap-1 cursor-pointer transition"
                               >
                                 Xem HĐ <ArrowUpRight className="w-3 h-3" />
                               </button>
@@ -974,7 +974,7 @@ export default function LandlordPortalPage() {
               </div>
               <button
                 type="submit"
-                className="px-5 py-2.5 rounded-xl bg-neutral-950 text-amber-400 border border-amber-500 font-bold cursor-pointer hover:bg-neutral-800 transition"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 font-bold cursor-pointer hover:bg-neutral-800 transition"
               >
                 + Ghi nhận sự cố
               </button>
@@ -1262,7 +1262,7 @@ export default function LandlordPortalPage() {
                   <button type="button" onClick={() => setShowPropertyModal(false)} className="px-4 py-2 rounded-xl border border-neutral-300 text-xs font-semibold cursor-pointer">
                     Hủy
                   </button>
-                  <button type="submit" className="px-5 py-2 rounded-xl bg-neutral-950 text-amber-400 border border-amber-500 text-xs font-bold cursor-pointer">
+                  <button type="submit" className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-bold cursor-pointer">
                     Lưu khu nhà
                   </button>
                 </div>
@@ -1381,7 +1381,7 @@ export default function LandlordPortalPage() {
                   <button type="button" onClick={() => setShowRoomModal(false)} className="px-4 py-2 rounded-xl border border-neutral-300 text-xs font-semibold cursor-pointer">
                     Hủy
                   </button>
-                  <button type="submit" className="px-5 py-2 rounded-xl bg-neutral-950 text-amber-400 border border-amber-500 text-xs font-bold cursor-pointer">
+                  <button type="submit" className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-bold cursor-pointer">
                     Lưu thông tin phòng
                   </button>
                 </div>
@@ -1552,7 +1552,7 @@ export default function LandlordPortalPage() {
                         note: c.note || undefined,
                       });
                     }}
-                    className="px-4 py-2 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Printer className="w-3.5 h-3.5" /> Xem / Tải Hóa đơn PDF
                   </button>
@@ -1703,7 +1703,7 @@ export default function LandlordPortalPage() {
                   <button
                     type="button"
                     onClick={() => printDepositReceiptPdf(receiptModalData)}
-                    className="px-3.5 py-1.5 rounded-xl bg-neutral-950 text-amber-400 border border-amber-500 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Printer className="w-3.5 h-3.5" /> In / Lưu PDF
                   </button>

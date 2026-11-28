@@ -62,10 +62,10 @@
         "delete": true
       },
       "landlord": {
-        "view": true,
-        "create": true,
-        "edit": true,
-        "delete": true
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
       }
     },
     "ACCOUNTANT": {
@@ -151,14 +151,14 @@
       },
       "sales": {
         "view": true,
-        "create": true,
-        "edit": true,
+        "create": false,
+        "edit": false,
         "delete": false
       },
       "rooms": {
         "view": true,
-        "create": true,
-        "edit": true,
+        "create": false,
+        "edit": false,
         "delete": false
       },
       "attendance": {
@@ -325,6 +325,74 @@
         "view": true,
         "create": true,
         "edit": true,
+        "delete": false
+      },
+      "employees": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "landlord": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      }
+    },
+    "INTERN": {
+      "dashboard": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "finance": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "sales": {
+        "view": true,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "rooms": {
+        "view": true,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "attendance": {
+        "view": true,
+        "create": true,
+        "edit": false,
+        "delete": false
+      },
+      "payroll": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "approvals": {
+        "view": true,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "it": {
+        "view": true,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "marketing": {
+        "view": true,
+        "create": false,
+        "edit": false,
         "delete": false
       },
       "employees": {

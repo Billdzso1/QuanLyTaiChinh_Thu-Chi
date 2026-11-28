@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
@@ -80,21 +80,21 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-[#09090b] p-4 overflow-hidden">
+    <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-cyan-950 p-4 overflow-hidden">
       <div
-        className="pointer-events-none absolute inset-0 opacity-30"
+        className="pointer-events-none absolute inset-0 opacity-45"
         style={{
           backgroundImage:
-            "radial-gradient(circle at 50% 15%, rgba(251,191,36,0.35), transparent 50%), radial-gradient(circle at 20% 85%, rgba(56,189,248,0.18), transparent 45%), linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px)",
+            "radial-gradient(circle at 20% 20%, rgba(99,102,241,0.45), transparent 45%), radial-gradient(circle at 80% 80%, rgba(6,182,212,0.35), transparent 45%), linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px)",
           backgroundSize: "100% 100%, 100% 100%, 38px 38px, 38px 38px",
         }}
       />
-      <div className="relative z-10 w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_25px_70px_-15px_rgba(251,191,36,0.3)] border-2 border-amber-400/80 p-8 nda-page-enter">
+      <div className="relative z-10 w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_25px_70px_-15px_rgba(79,70,229,0.4)] border border-indigo-200/80 p-8">
         <div className="flex items-center gap-3 mb-6">
           <CompanyLogo size={44} />
           <div>
-            <h1 className="text-xl font-bold text-neutral-950">ĐĂNG KÝ TÀI KHOẢN</h1>
-            <p className="text-xs text-neutral-600">NDAHOME Management • Chờ Admin phê duyệt</p>
+            <h1 className="text-xl font-extrabold text-slate-900">ĐĂNG KÝ TÀI KHOẢN</h1>
+            <p className="text-xs text-slate-500">NDAHOME Management • Chờ Admin phê duyệt</p>
           </div>
         </div>
 
@@ -109,7 +109,7 @@ export default function RegisterPage() {
             </div>
             <Link
               href="/login"
-              className="w-full py-2.5 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 font-bold text-sm inline-flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 font-bold text-sm inline-flex items-center justify-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" /> Quay lại Đăng nhập
             </Link>
@@ -259,7 +259,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 font-bold text-sm transition-colors disabled:opacity-50 cursor-pointer"
+              className="w-full py-2.5 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 font-bold text-sm transition-colors disabled:opacity-50 cursor-pointer"
             >
               {loading ? "Đang gửi đăng ký..." : "Đăng ký tài khoản"}
             </button>

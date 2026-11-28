@@ -14,6 +14,7 @@ export default function MarketingPage() {
   }>({ campaigns: [], leads: [], mktUsers: [] });
 
   const [showModal, setShowModal] = useState(false);
+  const [canCreateMkt, setCanCreateMkt] = useState(true);
   const [creating, setCreating] = useState(false);
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({
@@ -25,7 +26,13 @@ export default function MarketingPage() {
   });
 
   async function loadData() {
-    const res = await fetch("/api/departments/marketing");
+    const [res, meRes] = await Promise.all([fetch("/api/departments/marketing"), fetch("/api/auth/me")]);
+    if (meRes.ok) {
+      const me = await meRes.json();
+      if (me?.user?.permissions?.marketing) {
+        setCanCreateMkt(Boolean(me.user.permissions.marketing.create));
+      }
+    }
     if (res.ok) {
       const d = await res.json();
       setData(d);
@@ -75,12 +82,14 @@ export default function MarketingPage() {
             <h1 className="text-2xl font-bold text-neutral-900">Phòng Marketing — Chiến dịch & Quảng cáo</h1>
             <p className="text-sm text-neutral-500">Theo dõi ngân sách quảng cáo Facebook/TikTok/Google, số lượng Lead và tỷ lệ chuyển đổi</p>
           </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-2 cursor-pointer self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" /> Tạo dự án / chiến dịch mới
-          </button>
+          {canCreateMkt && (
+            <button
+              onClick={() => setShowModal(true)}
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium inline-flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" /> Tạo dự án / chiến dịch mới
+            </button>
+          )}
         </div>
 
         {msg && (
@@ -240,7 +249,7 @@ export default function MarketingPage() {
                   <button
                     type="submit"
                     disabled={creating}
-                    className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm font-medium cursor-pointer disabled:opacity-50"
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium cursor-pointer disabled:opacity-50"
                   >
                     {creating ? "Đang tạo..." : "Tạo dự án"}
                   </button>

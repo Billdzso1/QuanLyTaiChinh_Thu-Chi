@@ -65,21 +65,21 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-[#09090b] p-4 overflow-hidden">
+    <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-cyan-950 p-4 overflow-hidden">
       <div
-        className="pointer-events-none absolute inset-0 opacity-30"
+        className="pointer-events-none absolute inset-0 opacity-45"
         style={{
           backgroundImage:
-            "radial-gradient(circle at 50% 15%, rgba(251,191,36,0.35), transparent 50%), radial-gradient(circle at 80% 85%, rgba(16,185,129,0.18), transparent 45%), linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px)",
+            "radial-gradient(circle at 20% 20%, rgba(99,102,241,0.45), transparent 45%), radial-gradient(circle at 80% 80%, rgba(6,182,212,0.35), transparent 45%), linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px)",
           backgroundSize: "100% 100%, 100% 100%, 38px 38px, 38px 38px",
         }}
       />
-      <div className="relative z-10 w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_25px_70px_-15px_rgba(251,191,36,0.3)] border-2 border-amber-400/80 p-8 nda-page-enter">
+      <div className="relative z-10 w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_25px_70px_-15px_rgba(79,70,229,0.4)] border border-indigo-200/80 p-8">
         <div className="flex items-center gap-3 mb-6">
           <CompanyLogo size={44} />
           <div>
-            <h1 className="text-xl font-bold text-neutral-950">NDAHOME MANAGEMENT</h1>
-            <p className="text-xs text-neutral-600">Hệ thống quản lý tài chính & hoạt động nội bộ</p>
+            <h1 className="text-xl font-extrabold text-slate-900">NDAHOME MANAGEMENT</h1>
+            <p className="text-xs text-slate-500">Hệ thống quản lý tài chính & hoạt động nội bộ</p>
           </div>
         </div>
 
@@ -130,22 +130,22 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 font-bold text-sm transition-colors disabled:opacity-50 cursor-pointer"
+            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 hover:from-indigo-700 hover:via-blue-700 hover:to-cyan-700 text-white font-bold text-sm shadow-md shadow-indigo-500/25 transition-all disabled:opacity-50 cursor-pointer"
           >
             {loading ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>
 
-          <div className="text-center text-xs text-neutral-600 pt-1">
+          <div className="text-center text-xs text-slate-600 pt-1">
             Nhân sự mới chưa có tài khoản?{" "}
-            <Link href="/register" className="font-bold text-amber-700 hover:underline">
+            <Link href="/register" className="font-bold text-indigo-600 hover:underline">
               Đăng ký tài khoản
             </Link>
           </div>
         </form>
 
-        <div className="mt-6 pt-5 border-t border-neutral-200">
-          <div className="text-xs font-medium text-neutral-600 mb-2.5">
-            Chọn nhanh tài khoản demo (mật khẩu: <code className="text-neutral-950 font-bold">123456</code>):
+        <div className="mt-6 pt-5 border-t border-slate-200">
+          <div className="text-xs font-medium text-slate-600 mb-2.5">
+            Chọn nhanh tài khoản demo (mật khẩu: <code className="text-slate-900 font-bold">123456</code>):
           </div>
           <div className="flex flex-wrap gap-1.5">
             {DEMO_ACCOUNTS.map((acc) => (
@@ -156,7 +156,7 @@ export default function LoginPage() {
                   setEmail(acc.email);
                   setPassword("123456");
                 }}
-                className="px-2.5 py-1 rounded-md bg-amber-50 hover:bg-amber-500 hover:text-neutral-950 text-xs text-neutral-900 border border-amber-300 font-medium transition-colors cursor-pointer"
+                className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-600 hover:text-white text-xs text-indigo-900 border border-indigo-200 font-medium transition-colors cursor-pointer"
               >
                 {acc.label}
               </button>

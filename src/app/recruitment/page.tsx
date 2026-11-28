@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -303,7 +303,7 @@ export default function RecruitmentDirectorPage() {
                 setEditingAppId(null);
                 setShowAppModal(true);
               }}
-              className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium inline-flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Thêm hồ sơ xin việc
             </button>
@@ -385,7 +385,7 @@ export default function RecruitmentDirectorPage() {
               onClick={() => setTab("APPLICATIONS")}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer ${
                 tab === "APPLICATIONS"
-                  ? "bg-neutral-950 text-amber-400 border border-amber-500"
+                  ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20"
                   : "bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50"
               }`}
             >
@@ -395,7 +395,7 @@ export default function RecruitmentDirectorPage() {
               onClick={() => setTab("MEMBERS_SALARY")}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer ${
                 tab === "MEMBERS_SALARY"
-                  ? "bg-neutral-950 text-amber-400 border border-amber-500"
+                  ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20"
                   : "bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50"
               }`}
             >
@@ -485,7 +485,7 @@ export default function RecruitmentDirectorPage() {
                   onClick={() => setStatusFilter(sf.key as typeof statusFilter)}
                   className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer ${
                     statusFilter === sf.key
-                      ? "bg-neutral-950 text-amber-400"
+                      ? "bg-indigo-600 text-white shadow-sm"
                       : "bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
                   }`}
                 >
@@ -651,7 +651,7 @@ export default function RecruitmentDirectorPage() {
                             {m.avatar ? (
                               <img src={m.avatar} alt={m.fullName} className="w-9 h-9 rounded-full object-cover border border-amber-500/60" />
                             ) : (
-                              <div className="w-9 h-9 rounded-full bg-neutral-950 text-amber-400 flex items-center justify-center font-bold text-xs">
+                              <div className="w-9 h-9 rounded-full bg-indigo-600 text-white shadow-sm flex items-center justify-center font-bold text-xs">
                                 {m.fullName.split(" ").slice(-1)[0]?.[0] || "N"}
                               </div>
                             )}
@@ -829,7 +829,7 @@ export default function RecruitmentDirectorPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-950 text-amber-400 text-xs font-medium cursor-pointer">
+                  <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 text-white shadow-sm text-xs font-medium cursor-pointer">
                     <Upload className="w-3.5 h-3.5" />
                     {uploadingCv ? "Đang tải..." : "Tải tệp CV (Ảnh / PDF)"}
                     <input
@@ -866,7 +866,7 @@ export default function RecruitmentDirectorPage() {
                   <button type="button" onClick={() => setShowAppModal(false)} className="px-4 py-2 rounded-lg border text-sm cursor-pointer">
                     Hủy
                   </button>
-                  <button type="submit" className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm cursor-pointer">
+                  <button type="submit" className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm cursor-pointer">
                     {editingAppId ? "Lưu thay đổi" : "Lưu hồ sơ"}
                   </button>
                 </div>
@@ -957,7 +957,7 @@ export default function RecruitmentDirectorPage() {
                   )}
                 </div>
                 <div className="flex justify-end">
-                  <button type="submit" className="px-4 py-1.5 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-xs font-bold cursor-pointer">
+                  <button type="submit" className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs font-bold cursor-pointer">
                     Lưu chế độ lương
                   </button>
                 </div>
@@ -1063,7 +1063,7 @@ export default function RecruitmentDirectorPage() {
                     href={selectedApp.cvUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="px-3 py-1.5 rounded-lg bg-neutral-950 text-amber-400 text-xs font-bold inline-flex items-center gap-1.5"
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white shadow-sm text-xs font-bold inline-flex items-center gap-1.5"
                   >
                     <FileText className="w-3.5 h-3.5" /> Mở xem CV
                   </a>

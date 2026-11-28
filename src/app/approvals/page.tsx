@@ -212,7 +212,7 @@ export default function ApprovalsPage() {
           {activeTab === "APPROVALS" && (
             <button
               onClick={() => setShowModal(true)}
-              className="px-4 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-sm font-medium inline-flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium inline-flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Tạo đề xuất mới
             </button>
@@ -226,7 +226,7 @@ export default function ApprovalsPage() {
             onClick={() => setActiveTab("APPROVALS")}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeTab === "APPROVALS"
-                ? "bg-neutral-950 text-amber-400 shadow"
+                ? "bg-indigo-600 text-white shadow-sm shadow"
                 : "text-neutral-600 hover:bg-neutral-100"
             }`}
           >
@@ -237,7 +237,7 @@ export default function ApprovalsPage() {
             onClick={() => setActiveTab("BUDGETS")}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeTab === "BUDGETS"
-                ? "bg-neutral-950 text-amber-400 shadow"
+                ? "bg-indigo-600 text-white shadow-sm shadow"
                 : "text-neutral-600 hover:bg-neutral-100"
             }`}
           >
@@ -406,7 +406,7 @@ export default function ApprovalsPage() {
                                 setExpenseModalItem(a);
                                 setExpenseForm({ title: "", amount: "", receiptUrl: "" });
                               }}
-                              className="px-2.5 py-1 rounded bg-neutral-950 text-amber-400 border border-amber-500 text-xs inline-flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1 rounded bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-xs inline-flex items-center gap-1 cursor-pointer"
                             >
                               <Receipt className="w-3.5 h-3.5" /> + Chi tiêu / Up hóa đơn
                             </button>
@@ -540,7 +540,7 @@ export default function ApprovalsPage() {
                 <div>
                   <label className="block text-xs font-medium mb-1">Ảnh báo giá / Chứng từ (tùy chọn)</label>
                   <div className="flex items-center gap-3">
-                    <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-950 text-amber-400 text-xs font-medium cursor-pointer">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 text-white shadow-sm text-xs font-medium cursor-pointer">
                       <Upload className="w-3.5 h-3.5" />
                       {uploadingFile ? "Đang tải..." : "Tải tệp đính kèm"}
                       <input
@@ -577,7 +577,7 @@ export default function ApprovalsPage() {
                   <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 rounded-lg border text-sm cursor-pointer">
                     Hủy
                   </button>
-                  <button type="submit" className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm cursor-pointer">
+                  <button type="submit" className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm cursor-pointer">
                     Gửi đề xuất
                   </button>
                 </div>
@@ -672,7 +672,7 @@ export default function ApprovalsPage() {
                 <div>
                   <label className="block text-xs font-medium mb-1">Hóa đơn / Hình ảnh minh chứng</label>
                   <div className="flex items-center gap-3">
-                    <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-950 text-amber-400 text-xs font-medium cursor-pointer">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 text-white shadow-sm text-xs font-medium cursor-pointer">
                       <Upload className="w-3.5 h-3.5" />
                       {uploadingReceipt ? "Đang tải..." : "Scan / Tải hóa đơn"}
                       <input
@@ -709,7 +709,7 @@ export default function ApprovalsPage() {
                   <button type="button" onClick={() => setExpenseModalItem(null)} className="px-4 py-2 rounded-lg border text-sm cursor-pointer">
                     Hủy
                   </button>
-                  <button type="submit" className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-sm font-medium cursor-pointer">
+                  <button type="submit" className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white border border-indigo-500/30 shadow-sm shadow-indigo-500/20 text-sm font-medium cursor-pointer">
                     Lưu khoản chi
                   </button>
                 </div>

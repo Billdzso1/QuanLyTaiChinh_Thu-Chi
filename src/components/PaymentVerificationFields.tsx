@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import { Upload, FileText, X, CreditCard, Banknote, Layers, QrCode, Settings2 } from "lucide-react";
@@ -140,7 +140,7 @@ export function PaymentVerificationFields({
                 }}
                 className={`flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg border text-xs font-semibold transition cursor-pointer ${
                   active
-                    ? "bg-neutral-950 text-amber-400 border-amber-500 shadow-sm"
+                    ? "bg-indigo-600 text-white shadow-sm border-amber-500 shadow-sm"
                     : "bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50"
                 }`}
               >

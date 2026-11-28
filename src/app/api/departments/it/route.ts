@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateCode } from "@/lib/finance";
+import { requirePermission } from "@/lib/permissionsServer";
 
 export async function GET() {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "it", "view");
+  if (denied) return denied;
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const [projects, tasks, devices, itUsers] = await Promise.all([
@@ -35,6 +38,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "it", "create");
+  if (denied) return denied;
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
@@ -90,6 +95,8 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "it", "edit");
+  if (denied) return denied;
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();

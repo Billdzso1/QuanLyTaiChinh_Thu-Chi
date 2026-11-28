@@ -4,19 +4,16 @@ import { prisma } from "@/lib/prisma";
 import { generateCode } from "@/lib/finance";
 import { logAudit } from "@/lib/audit";
 import { readContractSplits, saveContractSplit, allocateContractRevenue } from "@/lib/contractSplits";
+import { requirePermission } from "@/lib/permissionsServer";
 
 export async function GET() {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "sales", "view");
+  if (denied) return denied;
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const where: Record<string, unknown> = {};
-  if (user.role === "SALES" && !user.isTeamLead) {
-    where.salesId = user.id;
-  }
 
   const [contracts, allActiveContracts, splits] = await Promise.all([
     prisma.contract.findMany({
-      where,
       include: {
         customer: true,
         room: { include: { property: true } },
@@ -35,14 +32,21 @@ export async function GET() {
   const statsMap = allocateContractRevenue(allActiveContracts, splits);
 
   if (user.role === "SALES") {
-    const safeContracts = contracts.map((c) => ({
-      ...c,
-      customer: {
-        ...c.customer,
-        email: null,
-        idCard: c.customer.idCard ? `****${c.customer.idCard.slice(-4)}` : null,
-      },
-    }));
+    const safeContracts = contracts.map((c) => {
+      const isMine = c.salesId === user.id;
+      const phone = String(c.customer.phone || "").trim();
+      const maskedPhone = phone.length > 6 ? `${phone.slice(0, 3)}****${phone.slice(-3)}` : "***";
+      return {
+        ...c,
+        companyRevenue: isMine ? c.companyRevenue : 0,
+        customer: {
+          ...c.customer,
+          phone: isMine ? c.customer.phone : maskedPhone,
+          email: null,
+          idCard: c.customer.idCard ? `****${c.customer.idCard.slice(-4)}` : null,
+        },
+      };
+    });
     const safeStats = user.isTeamLead
       ? statsMap
       : { [user.id]: statsMap[user.id] || { contractCount: 0, revenue: 0 } };
@@ -69,6 +73,8 @@ function formatPaymentSummary(
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "sales", "create");
+  if (denied) return denied;
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
@@ -194,8 +200,10 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   const user = await getCurrentUser();
-  if (!user || (!canAccessFinance(user.role as UserRole) && user.role !== "SALES")) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const denied = await requirePermission(user, "sales", "edit");
+  if (denied) return denied;
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const body = await request.json();

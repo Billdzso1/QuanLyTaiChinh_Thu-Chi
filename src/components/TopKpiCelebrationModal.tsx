@@ -278,7 +278,7 @@ export function TopKpiCelebrationModal({ userRole, userName }: { userRole?: stri
               >
                 <X className="w-5 h-5" />
               </button>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-950 text-amber-400 text-xs font-bold mb-2 animate-pulse">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-600 text-white shadow-sm text-xs font-bold mb-2 animate-pulse">
                 <Crown className="w-4 h-4" /> VINH DANH QUÁN QUÂN DOANH SỐ
               </div>
               <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center justify-center gap-2">

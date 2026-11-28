@@ -3,9 +3,12 @@ import { getCurrentUser, canAccessFinance, UserRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateCode } from "@/lib/finance";
 import { logAudit } from "@/lib/audit";
+import { requirePermission } from "@/lib/permissionsServer";
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "finance", "view");
+  if (denied) return denied;
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
@@ -36,6 +39,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "finance", "create");
+  if (denied) return denied;
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
@@ -104,6 +109,8 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   const user = await getCurrentUser();
+  const denied = await requirePermission(user, "finance", "edit");
+  if (denied) return denied;
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
