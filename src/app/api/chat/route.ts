@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { readFile, writeFile, mkdir } from "fs/promises";
+import { readFile } from "fs/promises";
 import path from "path";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
+import { getKvJson, setKvJson } from "@/lib/dbStore";
 
 export interface ChatMessageItem {
   id: string;
@@ -42,42 +43,66 @@ const CHAT_CHANNELS = [
   { id: "ACCOUNTING", name: "Phòng Kế toán & Tài chính", desc: "Chứng từ, thu chi, lương & thanh toán" },
 ];
 
+const CHAT_KV_KEY = "company_chat_store";
+
+function defaultChatStore(): ChatStore {
+  return {
+    messages: [
+      {
+        id: "welcome-msg-1",
+        channelId: "GENERAL",
+        senderId: "system",
+        senderName: "Hệ thống NDAHOME",
+        senderCode: "SYS",
+        senderRole: "ADMIN",
+        senderDept: "Ban Giám đốc",
+        senderEmpType: "FULL_TIME",
+        text: "Chào mừng toàn thể nhân sự NDAHOME đến với Nhóm Trao Đổi Nội Bộ! Mọi phòng ban có thể trao đổi công việc, gửi ảnh và thả cảm xúc tại đây.",
+        reactions: { "🎉": [], "👍": [] },
+        createdAt: new Date().toISOString(),
+      },
+    ],
+    moderation: { mutedUntil: {}, kicked: {} },
+  };
+}
+
 async function readChatStore(): Promise<ChatStore> {
+  try {
+    const dbData = await getKvJson<Partial<ChatStore>>(CHAT_KV_KEY);
+    if (dbData) {
+      return {
+        messages: dbData.messages || [],
+        moderation: {
+          mutedUntil: dbData.moderation?.mutedUntil || {},
+          kicked: dbData.moderation?.kicked || {},
+        },
+      };
+    }
+  } catch {
+    // Fallback below if DB query fails transiently
+  }
+
   try {
     const raw = await readFile(CHAT_FILE, "utf-8");
     const parsed = JSON.parse(raw) as Partial<ChatStore>;
-    return {
+    const initial: ChatStore = {
       messages: parsed.messages || [],
       moderation: {
         mutedUntil: parsed.moderation?.mutedUntil || {},
         kicked: parsed.moderation?.kicked || {},
       },
     };
+    await setKvJson(CHAT_KV_KEY, initial).catch(() => undefined);
+    return initial;
   } catch {
-    return {
-      messages: [
-        {
-          id: "welcome-msg-1",
-          channelId: "GENERAL",
-          senderId: "system",
-          senderName: "Hệ thống NDAHOME",
-          senderCode: "SYS",
-          senderRole: "ADMIN",
-          senderDept: "Ban Giám đốc",
-          senderEmpType: "FULL_TIME",
-          text: "Chào mừng toàn thể nhân sự NDAHOME đến với Nhóm Trao Đổi Nội Bộ! Mọi phòng ban có thể trao đổi công việc, gửi ảnh và thả cảm xúc tại đây.",
-          reactions: { "🎉": [], "👍": [] },
-          createdAt: new Date().toISOString(),
-        },
-      ],
-      moderation: { mutedUntil: {}, kicked: {} },
-    };
+    const initial = defaultChatStore();
+    await setKvJson(CHAT_KV_KEY, initial).catch(() => undefined);
+    return initial;
   }
 }
 
 async function saveChatStore(store: ChatStore) {
-  await mkdir(path.dirname(CHAT_FILE), { recursive: true });
-  await writeFile(CHAT_FILE, JSON.stringify(store, null, 2), "utf-8");
+  await setKvJson(CHAT_KV_KEY, store);
 }
 
 function getMuteRemaining(mutedUntilVal?: number): { isMuted: boolean; label: string } {
@@ -129,7 +154,7 @@ export async function GET(request: Request) {
       isTeamLead: m.isTeamLead,
       isActive: m.isActive,
       avatar: m.avatar,
-      departmentName: m.department.name,
+      departmentName: m.department?.name || "Chưa phân phòng",
       isMuted: mMute.isMuted,
       muteLabel: mMute.label,
       isKickedFromChannel: kickedUsers.includes(m.id),
@@ -172,29 +197,34 @@ export async function POST(request: Request) {
     );
   }
 
-  const newMsg: ChatMessageItem = {
-    id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    channelId,
-    senderId: user.id,
-    senderName: user.fullName,
-    senderCode: user.employeeCode,
-    senderRole: user.role,
-    senderDept: user.department.name,
-    senderEmpType: user.employmentType,
-    senderAvatar: user.avatar,
-    text,
-    imageUrl,
-    reactions: {},
-    createdAt: new Date().toISOString(),
-  };
+  try {
+    const newMsg: ChatMessageItem = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      channelId,
+      senderId: user.id,
+      senderName: user.fullName,
+      senderCode: user.employeeCode,
+      senderRole: user.role,
+      senderDept: user.department?.name || "Chưa phân phòng",
+      senderEmpType: user.employmentType || "FULL_TIME",
+      senderAvatar: user.avatar,
+      text,
+      imageUrl,
+      reactions: {},
+      createdAt: new Date().toISOString(),
+    };
 
-  store.messages.push(newMsg);
-  if (store.messages.length > 500) {
-    store.messages = store.messages.slice(-500);
+    store.messages.push(newMsg);
+    if (store.messages.length > 500) {
+      store.messages = store.messages.slice(-500);
+    }
+    await saveChatStore(store);
+
+    return NextResponse.json({ message: newMsg }, { status: 201 });
+  } catch (err) {
+    console.error("POST /api/chat failed:", err);
+    return NextResponse.json({ error: "Lỗi máy chủ khi lưu tin nhắn, vui lòng thử lại." }, { status: 500 });
   }
-  await saveChatStore(store);
-
-  return NextResponse.json({ message: newMsg }, { status: 201 });
 }
 
 export async function PATCH(request: Request) {

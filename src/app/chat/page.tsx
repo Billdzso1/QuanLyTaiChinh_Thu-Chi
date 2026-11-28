@@ -149,6 +149,7 @@ export default function CompanyChatPage() {
   const [text, setText] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [uploadingImg, setUploadingImg] = useState(false);
+  const [sending, setSending] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [previewImg, setPreviewImg] = useState<string | null>(null);
@@ -190,34 +191,49 @@ export default function CompanyChatPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingImg(true);
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch("/api/upload", { method: "POST", body: fd });
-    if (res.ok) {
-      const d = await res.json();
-      if (d.url) setImageUrl(d.url);
+    setErrorMsg("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.url) {
+        setImageUrl(d.url);
+      } else {
+        setErrorMsg(d.error || "Không tải được ảnh lên máy chủ");
+      }
+    } catch {
+      setErrorMsg("Lỗi kết nối khi tải ảnh lên");
+    } finally {
+      setUploadingImg(false);
     }
-    setUploadingImg(false);
   }
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     setErrorMsg("");
-    if (!text.trim() && !imageUrl) return;
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channelId: activeChannel, text, imageUrl: imageUrl || null }),
-    });
-    const d = await res.json();
-    if (!res.ok) {
-      setErrorMsg(d.error || "Không gửi được tin nhắn");
-      return;
+    if (sending || (!text.trim() && !imageUrl)) return;
+    setSending(true);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channelId: activeChannel, text, imageUrl: imageUrl || null }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorMsg(d.error || `Không gửi được tin nhắn (mã ${res.status})`);
+        return;
+      }
+      setText("");
+      setImageUrl("");
+      setShowEmojiPicker(false);
+      await loadChat(activeChannel);
+    } catch {
+      setErrorMsg("Lỗi kết nối máy chủ khi gửi tin nhắn. Vui lòng thử lại.");
+    } finally {
+      setSending(false);
     }
-    setText("");
-    setImageUrl("");
-    setShowEmojiPicker(false);
-    await loadChat(activeChannel);
   }
 
   async function handleReact(messageId: string, emoji: string) {
@@ -510,10 +526,10 @@ export default function CompanyChatPage() {
                     />
                     <button
                       type="submit"
-                      disabled={(myMute.isMuted && !isAdmin) || (!text.trim() && !imageUrl)}
+                      disabled={sending || (myMute.isMuted && !isAdmin) || (!text.trim() && !imageUrl)}
                       className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shrink-0"
                     >
-                      <Send className="w-3.5 h-3.5" /> Gửi
+                      <Send className="w-3.5 h-3.5" /> {sending ? "Đang gửi..." : "Gửi"}
                     </button>
                   </form>
                 </div>
