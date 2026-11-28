@@ -158,21 +158,27 @@ export default function CompanyChatPage() {
   const endRef = useRef<HTMLDivElement>(null);
 
   async function loadChat(ch = activeChannel) {
-    const [res, meRes] = await Promise.all([
-      fetch(`/api/chat?channelId=${ch}`, { cache: "no-store" }),
-      fetch("/api/auth/me", { cache: "no-store" }),
-    ]);
-    if (meRes.ok) {
-      const m = await meRes.json();
-      if (m.user) setMe({ id: m.user.id, role: m.user.role });
-    }
-    if (res.ok) {
-      const d = await res.json();
-      setChannels(d.channels || []);
-      setMessages(d.messages || []);
-      setMembers(d.members || []);
-      setIsKickedHere(Boolean(d.isKickedHere));
-      setMyMute(d.myMute || { isMuted: false, label: "" });
+    try {
+      const [res, meRes] = await Promise.all([
+        fetch(`/api/chat?channelId=${ch}`, { cache: "no-store" }),
+        fetch("/api/auth/me", { cache: "no-store" }),
+      ]);
+      if (meRes.ok) {
+        const m = await meRes.json().catch(() => null);
+        if (m?.user) setMe({ id: m.user.id, role: m.user.role });
+      }
+      if (res.ok) {
+        const d = await res.json().catch(() => null);
+        if (d) {
+          setChannels(d.channels || []);
+          setMessages(d.messages || []);
+          setMembers(d.members || []);
+          setIsKickedHere(Boolean(d.isKickedHere));
+          setMyMute(d.myMute || { isMuted: false, label: "" });
+        }
+      }
+    } catch {
+      // Bỏ qua lỗi mạng tạm thời khi tự động làm mới mỗi 4 giây
     }
   }
 
@@ -237,21 +243,29 @@ export default function CompanyChatPage() {
   }
 
   async function handleReact(messageId: string, emoji: string) {
-    await fetch("/api/chat", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "REACT", messageId, emoji }),
-    });
-    loadChat(activeChannel);
+    try {
+      await fetch("/api/chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "REACT", messageId, emoji }),
+      });
+      loadChat(activeChannel);
+    } catch {
+      setErrorMsg("Không thể thả cảm xúc lúc này.");
+    }
   }
 
   async function handleDeleteMsg(messageId: string) {
-    await fetch("/api/chat", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "DELETE_MSG", messageId }),
-    });
-    loadChat(activeChannel);
+    try {
+      await fetch("/api/chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "DELETE_MSG", messageId }),
+      });
+      loadChat(activeChannel);
+    } catch {
+      setErrorMsg("Không thể xóa tin nhắn lúc này.");
+    }
   }
 
   async function handleModerate(
@@ -259,19 +273,23 @@ export default function CompanyChatPage() {
     targetUserId: string,
     extra?: { minutes?: number }
   ) {
-    const res = await fetch("/api/chat", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action,
-        targetUserId,
-        channelId: activeChannel,
-        minutes: extra?.minutes,
-      }),
-    });
-    if (res.ok) {
-      setModMember(null);
-      loadChat(activeChannel);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          targetUserId,
+          channelId: activeChannel,
+          minutes: extra?.minutes,
+        }),
+      });
+      if (res.ok) {
+        setModMember(null);
+        loadChat(activeChannel);
+      }
+    } catch {
+      setErrorMsg("Không thể thực hiện kiểm duyệt lúc này.");
     }
   }
 

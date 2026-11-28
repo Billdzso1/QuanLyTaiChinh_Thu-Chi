@@ -219,15 +219,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   async function loadNotifications() {
-    const r = await fetch("/api/notifications");
-    if (r.ok) {
-      const d = await r.json();
-      if (d?.notifications) {
-        setNotifications(d.notifications);
-        const count = d.notifications.filter((n: NotificationItem) => !n.isRead).length;
-        cachedUnreadCount = count;
-        setUnreadCount(count);
+    try {
+      const r = await fetch("/api/notifications");
+      if (r.ok) {
+        const d = await r.json().catch(() => null);
+        if (d?.notifications) {
+          setNotifications(d.notifications);
+          const count = d.notifications.filter((n: NotificationItem) => !n.isRead).length;
+          cachedUnreadCount = count;
+          setUnreadCount(count);
+        }
       }
+    } catch {
+      // Ignore transient network errors
     }
   }
 
@@ -243,7 +247,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           cachedUser = null;
           router.push("/login");
         }
-      });
+      })
+      .catch(() => undefined);
     loadNotifications();
   }, [router]);
 
