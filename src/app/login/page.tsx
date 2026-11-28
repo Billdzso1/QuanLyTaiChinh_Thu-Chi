@@ -45,7 +45,16 @@ export default function LoginPage() {
         if (data.token) {
           sessionStorage.setItem("ndahome_tab_token", data.token);
         }
-        router.push(data.user?.role === "LANDLORD" ? "/landlord" : "/");
+        const role = data.user?.role;
+        const homeByRole: Record<string, string> = {
+          ADMIN: "/",
+          ACCOUNTANT: "/",
+          SALES: "/sales",
+          IT: "/it",
+          MARKETING: "/marketing",
+          LANDLORD: "/landlord",
+        };
+        router.push(homeByRole[role] || "/attendance");
         router.refresh();
       }
     } catch {

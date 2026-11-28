@@ -87,7 +87,7 @@ export function getDefaultPermissionMatrix(): RolePermissionMatrix {
       landlord: { ...NONE },
     },
     SALES: {
-      dashboard: { ...VIEW_ONLY },
+      dashboard: { ...NONE },
       finance: { ...NONE },
       sales: { ...VIEW_CREATE_EDIT },
       rooms: { ...VIEW_CREATE_EDIT },
@@ -100,7 +100,7 @@ export function getDefaultPermissionMatrix(): RolePermissionMatrix {
       landlord: { ...NONE },
     },
     IT: {
-      dashboard: { ...VIEW_ONLY },
+      dashboard: { ...NONE },
       finance: { ...NONE },
       sales: { ...NONE },
       rooms: { ...NONE },
@@ -113,7 +113,7 @@ export function getDefaultPermissionMatrix(): RolePermissionMatrix {
       landlord: { ...NONE },
     },
     MARKETING: {
-      dashboard: { ...VIEW_ONLY },
+      dashboard: { ...NONE },
       finance: { ...NONE },
       sales: { ...NONE },
       rooms: { ...NONE },

@@ -55,7 +55,12 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Dashboard Tổng quan", icon: <LayoutDashboard className="w-4 h-4" /> },
+  {
+    href: "/",
+    label: "Dashboard Tổng quan",
+    icon: <LayoutDashboard className="w-4 h-4" />,
+    roles: ["ADMIN", "ACCOUNTANT"],
+  },
   {
     href: "/finance",
     label: "Thu Chi & Công nợ",
@@ -442,7 +447,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main key={pathname} className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto nda-page-enter">
+        <main key={pathname} className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto">
           {children}
         </main>
 
@@ -468,7 +473,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <ul className="space-y-2 text-xs">
                 <li>
                   <Link
-                    href={user?.role === "LANDLORD" ? "/landlord" : "/"}
+                    href={
+                      user?.role === "LANDLORD"
+                        ? "/landlord"
+                        : user?.role === "SALES"
+                          ? "/sales"
+                          : user?.role === "IT"
+                            ? "/it"
+                            : user?.role === "MARKETING"
+                              ? "/marketing"
+                              : "/"
+                    }
                     className="hover:text-amber-400 transition-colors"
                   >
                     Trang làm việc chính

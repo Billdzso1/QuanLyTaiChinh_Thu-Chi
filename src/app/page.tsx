@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { TopKpiPodium, TopKpiMember } from "@/components/TopKpiPodium";
 import { formatVND, formatShortVND } from "@/lib/finance";
@@ -64,20 +65,36 @@ interface DashboardData {
 const PIE_COLORS = ["#d97706", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string>("");
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/dashboard").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/auth/me").then((r) => (r.ok ? r.json() : null)),
-    ]).then(([d, me]) => {
-      setData(d);
-      setUserRole(me?.user?.role || "");
-      setLoading(false);
-    });
-  }, []);
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((me) => {
+        const role = me?.user?.role || "";
+        setUserRole(role);
+        if (role && role !== "ADMIN" && role !== "ACCOUNTANT") {
+          const homeByRole: Record<string, string> = {
+            SALES: "/sales",
+            IT: "/it",
+            MARKETING: "/marketing",
+            LANDLORD: "/landlord",
+          };
+          router.replace(homeByRole[role] || "/attendance");
+          return;
+        }
+        return fetch("/api/dashboard")
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            setData(d);
+            setLoading(false);
+          });
+      })
+      .catch(() => setLoading(false));
+  }, [router]);
 
   const canExport = userRole === "ADMIN" || userRole === "ACCOUNTANT";
 

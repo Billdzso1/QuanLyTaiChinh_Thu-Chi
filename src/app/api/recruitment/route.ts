@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateCode } from "@/lib/finance";
 import { logAudit } from "@/lib/audit";
+import { notifyInterviewSchedule } from "@/lib/interviewNotify";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -60,6 +61,17 @@ export async function POST(request: Request) {
     entityId: app.id,
     details: `Thêm hồ sơ ứng viên ${app.fullName} (${app.position})`,
   });
+
+  if (app.interviewDate) {
+    await notifyInterviewSchedule({
+      actorId: user.id,
+      candidateName: app.fullName,
+      candidateEmail: app.email,
+      position: app.position,
+      interviewTime: app.interviewDate,
+      link: "/recruitment",
+    });
+  }
 
   return NextResponse.json({ application: app }, { status: 201 });
 }
@@ -167,6 +179,17 @@ export async function PATCH(request: Request) {
       note: body.note !== undefined ? body.note : undefined,
     },
   });
+
+  if (body.interviewDate) {
+    await notifyInterviewSchedule({
+      actorId: user.id,
+      candidateName: updated.fullName,
+      candidateEmail: updated.email,
+      position: updated.position,
+      interviewTime: body.interviewDate,
+      link: "/recruitment",
+    });
+  }
 
   return NextResponse.json({ application: updated });
 }

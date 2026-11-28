@@ -1,14 +1,40 @@
 import { NextResponse } from "next/server";
+import { readFile, writeFile, mkdir } from "fs/promises";
+import path from "path";
 import bcrypt from "bcryptjs";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
+import { notifyInterviewSchedule } from "@/lib/interviewNotify";
+
+interface EmployeeExtraProfile {
+  cvUrl?: string | null;
+  recruitmentStatus?: string | null;
+  statusNote?: string | null;
+  interviewAt?: string | null;
+}
+
+const PROFILES_FILE = path.join(process.cwd(), "data", "employee-profiles.json");
+
+async function readExtraProfiles(): Promise<Record<string, EmployeeExtraProfile>> {
+  try {
+    const raw = await readFile(PROFILES_FILE, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+async function saveExtraProfiles(data: Record<string, EmployeeExtraProfile>) {
+  await mkdir(path.dirname(PROFILES_FILE), { recursive: true });
+  await writeFile(PROFILES_FILE, JSON.stringify(data, null, 2), "utf-8");
+}
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const [users, departments] = await Promise.all([
+  const [users, departments, extraProfiles] = await Promise.all([
     prisma.user.findMany({
       include: { department: true },
       orderBy: { employeeCode: "asc" },
@@ -17,9 +43,16 @@ export async function GET() {
       include: { _count: { select: { users: true } } },
       orderBy: { code: "asc" },
     }),
+    readExtraProfiles(),
   ]);
 
-  const sanitized = users.map(({ passwordHash: _, ...rest }) => rest);
+  const sanitized = users.map(({ passwordHash: _, ...rest }) => ({
+    ...rest,
+    cvUrl: extraProfiles[rest.id]?.cvUrl || null,
+    recruitmentStatus: extraProfiles[rest.id]?.recruitmentStatus || null,
+    statusNote: extraProfiles[rest.id]?.statusNote || null,
+    interviewAt: extraProfiles[rest.id]?.interviewAt || null,
+  }));
   return NextResponse.json({ users: sanitized, departments });
 }
 
@@ -64,8 +97,42 @@ export async function POST(request: Request) {
     details: `Thêm nhân sự ${created.fullName} (${created.role})`,
   });
 
+  if (body.cvUrl || body.recruitmentStatus || body.statusNote || body.interviewAt) {
+    const profiles = await readExtraProfiles();
+    profiles[created.id] = {
+      cvUrl: body.cvUrl || null,
+      recruitmentStatus: body.recruitmentStatus || null,
+      statusNote: body.statusNote || null,
+      interviewAt: body.interviewAt || null,
+    };
+    await saveExtraProfiles(profiles);
+  }
+
+  if (body.interviewAt) {
+    await notifyInterviewSchedule({
+      actorId: user.id,
+      candidateName: created.fullName,
+      candidateEmail: created.email,
+      position: created.position,
+      interviewTime: body.interviewAt,
+      link: "/employees",
+      targetUserId: created.id,
+    });
+  }
+
   const { passwordHash: _, ...rest } = created;
-  return NextResponse.json({ user: rest }, { status: 201 });
+  return NextResponse.json(
+    {
+      user: {
+        ...rest,
+        cvUrl: body.cvUrl || null,
+        recruitmentStatus: body.recruitmentStatus || null,
+        statusNote: body.statusNote || null,
+        interviewAt: body.interviewAt || null,
+      },
+    },
+    { status: 201 }
+  );
 }
 
 export async function PATCH(request: Request) {
@@ -111,6 +178,36 @@ export async function PATCH(request: Request) {
         type: "SUCCESS",
         link: "/",
       },
+    });
+  }
+
+  if (
+    body.cvUrl !== undefined ||
+    body.recruitmentStatus !== undefined ||
+    body.statusNote !== undefined ||
+    body.interviewAt !== undefined
+  ) {
+    const profiles = await readExtraProfiles();
+    const cur = profiles[updated.id] || {};
+    profiles[updated.id] = {
+      cvUrl: body.cvUrl !== undefined ? body.cvUrl : cur.cvUrl,
+      recruitmentStatus:
+        body.recruitmentStatus !== undefined ? body.recruitmentStatus : cur.recruitmentStatus,
+      statusNote: body.statusNote !== undefined ? body.statusNote : cur.statusNote,
+      interviewAt: body.interviewAt !== undefined ? body.interviewAt : cur.interviewAt,
+    };
+    await saveExtraProfiles(profiles);
+  }
+
+  if (body.interviewAt) {
+    await notifyInterviewSchedule({
+      actorId: user.id,
+      candidateName: updated.fullName,
+      candidateEmail: updated.email,
+      position: updated.position,
+      interviewTime: body.interviewAt,
+      link: "/employees",
+      targetUserId: updated.id,
     });
   }
 

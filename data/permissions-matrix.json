@@ -1,0 +1,413 @@
+{
+  "matrix": {
+    "ADMIN": {
+      "dashboard": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true
+      },
+      "finance": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true
+      },
+      "sales": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true
+      },
+      "rooms": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true
+      },
+      "attendance": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true
+      },
+      "payroll": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true
+      },
+      "approvals": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true
+      },
+      "it": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true
+      },
+      "marketing": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true
+      },
+      "employees": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true
+      },
+      "landlord": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true
+      }
+    },
+    "ACCOUNTANT": {
+      "dashboard": {
+        "view": true,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "finance": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": false
+      },
+      "sales": {
+        "view": true,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "rooms": {
+        "view": true,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "attendance": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": false
+      },
+      "payroll": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": false
+      },
+      "approvals": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": false
+      },
+      "it": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "marketing": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "employees": {
+        "view": true,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "landlord": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      }
+    },
+    "SALES": {
+      "dashboard": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "finance": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "sales": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": false
+      },
+      "rooms": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": false
+      },
+      "attendance": {
+        "view": true,
+        "create": true,
+        "edit": false,
+        "delete": false
+      },
+      "payroll": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "approvals": {
+        "view": true,
+        "create": true,
+        "edit": false,
+        "delete": false
+      },
+      "it": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "marketing": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "employees": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "landlord": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      }
+    },
+    "IT": {
+      "dashboard": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "finance": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "sales": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "rooms": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "attendance": {
+        "view": true,
+        "create": true,
+        "edit": false,
+        "delete": false
+      },
+      "payroll": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "approvals": {
+        "view": true,
+        "create": true,
+        "edit": false,
+        "delete": false
+      },
+      "it": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": false
+      },
+      "marketing": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "employees": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "landlord": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      }
+    },
+    "MARKETING": {
+      "dashboard": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "finance": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "sales": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "rooms": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "attendance": {
+        "view": true,
+        "create": true,
+        "edit": false,
+        "delete": false
+      },
+      "payroll": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "approvals": {
+        "view": true,
+        "create": true,
+        "edit": false,
+        "delete": false
+      },
+      "it": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "marketing": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": false
+      },
+      "employees": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "landlord": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      }
+    },
+    "LANDLORD": {
+      "dashboard": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "finance": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "sales": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "rooms": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": false
+      },
+      "attendance": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "payroll": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "approvals": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "it": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "marketing": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "employees": {
+        "view": false,
+        "create": false,
+        "edit": false,
+        "delete": false
+      },
+      "landlord": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": false
+      }
+    }
+  },
+  "userOverrides": {}
+}

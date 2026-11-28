@@ -20,6 +20,8 @@ import {
   RotateCcw,
   Save,
   KeyRound,
+  FileText,
+  ExternalLink,
 } from "lucide-react";
 import {
   PERMISSION_MODULES,
@@ -50,7 +52,30 @@ interface Employee {
   isActive: boolean;
   baseSalary: number;
   allowance: number;
+  cvUrl?: string | null;
+  recruitmentStatus?: string | null;
+  statusNote?: string | null;
+  interviewAt?: string | null;
   department: { id: string; code: string; name: string };
+}
+
+const RECRUITMENT_STATUS_OPTIONS = [
+  { value: "CHO_PHONG_VAN", label: "Chờ phỏng vấn", cls: "bg-amber-100 text-amber-800 border-amber-200" },
+  { value: "DANG_PHONG_VAN", label: "Đang phỏng vấn", cls: "bg-sky-100 text-sky-800 border-sky-200" },
+  { value: "CHO_KET_QUA", label: "Chờ kết quả", cls: "bg-violet-100 text-violet-800 border-violet-200" },
+  { value: "DAT", label: "Đạt", cls: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+  { value: "KHONG_DAT", label: "Không đạt", cls: "bg-rose-100 text-rose-700 border-rose-200" },
+  { value: "THUC_TAP", label: "Đang thực tập", cls: "bg-sky-100 text-sky-800 border-sky-200" },
+  { value: "CHINH_THUC", label: "Nhân viên chính thức", cls: "bg-emerald-100 text-emerald-800 border-emerald-300" },
+] as const;
+
+function getNextEmployeeCode(list: Employee[]): string {
+  let maxNum = 16;
+  for (const u of list) {
+    const m = u.employeeCode.match(/NDA-(\d+)/);
+    if (m) maxNum = Math.max(maxNum, Number(m[1]));
+  }
+  return `NDA-${String(maxNum + 1).padStart(3, "0")}`;
 }
 
 interface Dept {
@@ -93,9 +118,11 @@ export default function EmployeesPage() {
   const [savingPerms, setSavingPerms] = useState(false);
   const [permMessage, setPermMessage] = useState("");
   const [permUserModal, setPermUserModal] = useState<Employee | null>(null);
+  const [uploadingCv, setUploadingCv] = useState(false);
+  const [cvFileName, setCvFileName] = useState("");
 
   const [form, setForm] = useState({
-    employeeCode: "NDA-017",
+    employeeCode: "NDA-020",
     email: "",
     fullName: "",
     phone: "",
@@ -111,7 +138,41 @@ export default function EmployeesPage() {
     baseSalary: "2000000",
     allowance: "500000",
     isTeamLead: false,
+    cvUrl: "",
+    recruitmentStatus: "CHINH_THUC",
+    statusNote: "",
+    interviewAt: "",
   });
+
+  function mapRoleToDeptCode(role: string): string {
+    if (role === "ACCOUNTANT") return "ACCOUNTING";
+    if (role === "ADMIN" || role === "LANDLORD") return "DIRECTOR";
+    return role;
+  }
+
+  function suggestPosition(role: string, employmentType: string): string {
+    const isIntern = employmentType === "INTERN";
+    const map: Record<string, string> = {
+      SALES: isIntern ? "Thực tập sinh Sales" : "Nhân viên Sales",
+      IT: isIntern ? "Thực tập sinh IT" : "Nhân viên IT",
+      MARKETING: isIntern ? "Thực tập sinh Marketing" : "Nhân viên Marketing",
+      ACCOUNTANT: isIntern ? "Thực tập sinh Kế toán" : "Nhân viên Kế toán",
+      ADMIN: "Giám đốc",
+      LANDLORD: "Chủ trọ / Đối tác",
+    };
+    return map[role] || (isIntern ? "Thực tập sinh" : "Nhân viên");
+  }
+
+  function handleRoleDeptSelect(nextRole: string, deptList = departments, empType = form.employmentType) {
+    const targetCode = mapRoleToDeptCode(nextRole);
+    const matchedDept = deptList.find((d) => d.code === targetCode) || deptList[0];
+    setForm((f) => ({
+      ...f,
+      role: nextRole,
+      departmentId: matchedDept?.id || f.departmentId,
+      position: suggestPosition(nextRole, empType),
+    }));
+  }
 
   async function loadData() {
     const [empRes, meRes, permRes] = await Promise.all([
@@ -123,9 +184,13 @@ export default function EmployeesPage() {
       const d = await empRes.json();
       setUsers(d.users);
       setDepartments(d.departments);
-      if (d.departments?.length && !form.departmentId) {
-        setForm((f) => ({ ...f, departmentId: d.departments[0].id }));
-      }
+      const nextCode = getNextEmployeeCode(d.users || []);
+      const salesDept = (d.departments || []).find((dep: Dept) => dep.code === "SALES") || d.departments?.[0];
+      setForm((f) => ({
+        ...f,
+        employeeCode: nextCode,
+        departmentId: f.departmentId || salesDept?.id || "",
+      }));
     }
     if (meRes.ok) {
       const m = await meRes.json();
@@ -161,6 +226,41 @@ export default function EmployeesPage() {
     setUploadingAvatar(false);
   }
 
+  async function handleFormCvUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingCv(true);
+    const url = await uploadImage(file);
+    if (url) {
+      setForm((f) => ({ ...f, cvUrl: url }));
+      setCvFileName(file.name);
+    }
+    setUploadingCv(false);
+  }
+
+  async function handleQuickCvUpload(userId: string, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = await uploadImage(file);
+    if (url) {
+      await fetch("/api/employees", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: userId, cvUrl: url }),
+      });
+      loadData();
+    }
+  }
+
+  async function handleQuickStatusChange(userId: string, recruitmentStatus: string) {
+    await fetch("/api/employees", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: userId, recruitmentStatus }),
+    });
+    loadData();
+  }
+
   async function handleQuickAvatarUpdate(userId: string, e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -184,15 +284,19 @@ export default function EmployeesPage() {
     });
     if (res.ok) {
       setShowModal(false);
+      setCvFileName("");
       setForm({
         ...form,
-        employeeCode: `NDA-0${users.length + 2}`,
+        employeeCode: getNextEmployeeCode(users),
         email: "",
         fullName: "",
         phone: "",
         avatar: "",
         university: "",
         mentorName: "",
+        cvUrl: "",
+        statusNote: "",
+        interviewAt: "",
       });
       loadData();
     }
@@ -505,6 +609,63 @@ export default function EmployeesPage() {
         ) : (
           <>
 
+        {/* Lịch hẹn phỏng vấn sắp tới */}
+        {users.some((u) => u.interviewAt || u.recruitmentStatus === "CHO_PHONG_VAN" || u.recruitmentStatus === "DANG_PHONG_VAN") && (
+          <div className="bg-gradient-to-r from-sky-50 via-white to-amber-50/70 border border-sky-200 border-l-4 border-l-sky-500 rounded-xl p-4 space-y-2.5 shadow-2xs">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-bold text-sm text-neutral-950 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-sky-600" />
+                Lịch hẹn phỏng vấn ({users.filter((u) => u.interviewAt || u.recruitmentStatus === "CHO_PHONG_VAN" || u.recruitmentStatus === "DANG_PHONG_VAN").length})
+              </div>
+              <span className="text-[11px] text-sky-800 font-medium">Hiển thị các hồ sơ có lịch hẹn / đang chờ phỏng vấn</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {users
+                .filter((u) => u.interviewAt || u.recruitmentStatus === "CHO_PHONG_VAN" || u.recruitmentStatus === "DANG_PHONG_VAN")
+                .map((u) => {
+                  const st = RECRUITMENT_STATUS_OPTIONS.find((o) => o.value === u.recruitmentStatus);
+                  return (
+                    <div
+                      key={u.id}
+                      className="p-3 rounded-lg bg-white border border-sky-100 hover:border-sky-300 transition-all flex items-start justify-between gap-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-semibold text-xs text-neutral-900 truncate">
+                          {u.fullName} <span className="font-mono text-amber-700">({u.employeeCode})</span>
+                        </div>
+                        <div className="text-[11px] text-neutral-500 truncate">
+                          {u.department.name} • {u.position}
+                        </div>
+                        <div className="text-[11px] font-semibold text-sky-700 mt-1">
+                          {u.interviewAt
+                            ? `📅 ${new Date(u.interviewAt).toLocaleString("vi-VN")}`
+                            : "⏳ Chưa ấn định giờ PV"}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        {st && (
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${st.cls}`}>
+                            {st.label}
+                          </span>
+                        )}
+                        {u.cvUrl && (
+                          <a
+                            href={u.cvUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[10px] font-semibold text-rose-700 hover:underline"
+                          >
+                            Xem CV
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
         {/* Tài khoản mới đăng ký chờ Admin duyệt */}
         {pendingUsers.length > 0 && (
           <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-4 space-y-3">
@@ -550,16 +711,50 @@ export default function EmployeesPage() {
 
         {/* Departments */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {departments.map((d) => (
-            <div
-              key={d.id}
-              className="bg-white p-4 rounded-xl border border-neutral-200 transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
-            >
-              <div className="text-xs font-medium text-neutral-500">{d.name}</div>
-              <div className="text-2xl font-bold text-amber-600 mt-1">{d._count.users}</div>
-              <div className="text-[11px] text-neutral-400">nhân sự</div>
-            </div>
-          ))}
+          {departments.map((d, idx) => {
+            const deptThemes: Record<string, { card: string; num: string; badge: string }> = {
+              ACCOUNTING: {
+                card: "border-l-4 border-l-emerald-500 bg-gradient-to-br from-white to-emerald-50/70",
+                num: "text-emerald-700",
+                badge: "bg-emerald-100 text-emerald-700",
+              },
+              DIRECTOR: {
+                card: "border-l-4 border-l-amber-500 bg-gradient-to-br from-white to-amber-50/80",
+                num: "text-amber-700",
+                badge: "bg-amber-100 text-amber-800",
+              },
+              IT: {
+                card: "border-l-4 border-l-violet-500 bg-gradient-to-br from-white to-violet-50/70",
+                num: "text-violet-700",
+                badge: "bg-violet-100 text-violet-700",
+              },
+              MARKETING: {
+                card: "border-l-4 border-l-rose-500 bg-gradient-to-br from-white to-rose-50/70",
+                num: "text-rose-700",
+                badge: "bg-rose-100 text-rose-700",
+              },
+              SALES: {
+                card: "border-l-4 border-l-sky-500 bg-gradient-to-br from-white to-sky-50/70",
+                num: "text-sky-700",
+                badge: "bg-sky-100 text-sky-700",
+              },
+            };
+            const fallbackThemes = Object.values(deptThemes);
+            const theme = deptThemes[d.code] || fallbackThemes[idx % fallbackThemes.length];
+            return (
+              <div
+                key={d.id}
+                className={`p-4 rounded-xl border border-neutral-200 ${theme.card} transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs font-semibold text-neutral-600">{d.name}</div>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${theme.badge}`}>{d.code}</span>
+                </div>
+                <div className={`text-2xl font-bold mt-1.5 tabular-nums ${theme.num}`}>{d._count.users}</div>
+                <div className="text-[11px] text-neutral-500">nhân sự</div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Filter Tabs & Search */}
@@ -648,6 +843,75 @@ export default function EmployeesPage() {
                           <GraduationCap className="w-3 h-3" />
                           {u.university || "Sinh viên thực tập"}
                           {u.mentorName ? ` • HD: ${u.mentorName}` : ""}
+                        </div>
+                      )}
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        {currentUser?.role === "ADMIN" ? (
+                          <select
+                            value={
+                              u.recruitmentStatus ||
+                              (u.employmentType === "INTERN" ? "THUC_TAP" : "CHINH_THUC")
+                            }
+                            onChange={(e) => handleQuickStatusChange(u.id, e.target.value)}
+                            className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border cursor-pointer ${
+                              RECRUITMENT_STATUS_OPTIONS.find(
+                                (o) =>
+                                  o.value ===
+                                  (u.recruitmentStatus ||
+                                    (u.employmentType === "INTERN" ? "THUC_TAP" : "CHINH_THUC"))
+                              )?.cls || "bg-neutral-100 text-neutral-700 border-neutral-200"
+                            }`}
+                          >
+                            {RECRUITMENT_STATUS_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value} className="bg-white text-neutral-900">
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          u.recruitmentStatus && (
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                                RECRUITMENT_STATUS_OPTIONS.find((o) => o.value === u.recruitmentStatus)?.cls ||
+                                "bg-neutral-100 text-neutral-700 border-neutral-200"
+                              }`}
+                            >
+                              {RECRUITMENT_STATUS_OPTIONS.find((o) => o.value === u.recruitmentStatus)?.label ||
+                                u.recruitmentStatus}
+                            </span>
+                          )
+                        )}
+                        {u.cvUrl ? (
+                          <a
+                            href={u.cvUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-semibold"
+                          >
+                            <FileText className="w-3 h-3" /> Xem CV (PDF) <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        ) : (
+                          currentUser?.role === "ADMIN" && (
+                            <label className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-[11px] font-medium cursor-pointer">
+                              <Upload className="w-3 h-3" /> Nộp CV PDF
+                              <input
+                                type="file"
+                                accept=".pdf,application/pdf"
+                                onChange={(e) => handleQuickCvUpload(u.id, e)}
+                                className="hidden"
+                              />
+                            </label>
+                          )
+                        )}
+                      </div>
+                      {u.interviewAt && (
+                        <div className="text-[11px] text-sky-700 mt-0.5 font-medium">
+                          📅 Phỏng vấn dự kiến: {new Date(u.interviewAt).toLocaleString("vi-VN")}
+                        </div>
+                      )}
+                      {u.statusNote && (
+                        <div className="text-[11px] text-neutral-500 mt-0.5 italic">
+                          Ghi chú: {u.statusNote}
                         </div>
                       )}
                     </td>
@@ -763,13 +1027,15 @@ export default function EmployeesPage() {
                     <label className="block text-xs font-medium mb-1">Loại hình nhân sự</label>
                     <select
                       value={form.employmentType}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          employmentType: e.target.value,
-                          position: e.target.value === "INTERN" ? "Sinh viên thực tập" : "Nhân viên",
-                        })
-                      }
+                      onChange={(e) => {
+                        const empType = e.target.value;
+                        setForm((f) => ({
+                          ...f,
+                          employmentType: empType,
+                          recruitmentStatus: empType === "INTERN" ? "THUC_TAP" : "CHINH_THUC",
+                          position: suggestPosition(f.role, empType),
+                        }));
+                      }}
                       className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
                     >
                       <option value="FULL_TIME">Nhân viên chính thức</option>
@@ -780,7 +1046,7 @@ export default function EmployeesPage() {
                     <label className="block text-xs font-medium mb-1">Mã nhân sự</label>
                     <input
                       required
-                      placeholder="VD: NDA-017"
+                      placeholder="VD: NDA-020"
                       value={form.employeeCode}
                       onChange={(e) => setForm({ ...form, employeeCode: e.target.value })}
                       className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
@@ -789,62 +1055,66 @@ export default function EmployeesPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <input
-                    required
-                    placeholder="Họ và tên"
-                    value={form.fullName}
-                    onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-                    className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="email"
-                    required
-                    placeholder="Email (@ndahome.vn)"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
-                  />
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Họ và tên</label>
+                    <input
+                      required
+                      placeholder="Nhập họ và tên"
+                      value={form.fullName}
+                      onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                      className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Email đăng nhập</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="ten@ndahome.vn"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <select
-                    value={form.role}
-                    onChange={(e) => setForm({ ...form, role: e.target.value })}
-                    className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
-                  >
-                    <option value="SALES">Sales</option>
-                    <option value="IT">IT</option>
-                    <option value="MARKETING">Marketing</option>
-                    <option value="ACCOUNTANT">Kế toán</option>
-                    <option value="ADMIN">Giám đốc</option>
-                    <option value="LANDLORD">Chủ trọ / Đối tác</option>
-                  </select>
-                  <select
-                    value={form.departmentId}
-                    onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
-                    className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
-                  >
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Phòng ban &amp; Quyền hạn</label>
+                    <select
+                      value={form.role}
+                      onChange={(e) => handleRoleDeptSelect(e.target.value)}
+                      className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                    >
+                      <option value="SALES">Phòng Sales</option>
+                      <option value="IT">Phòng IT</option>
+                      <option value="MARKETING">Phòng Marketing</option>
+                      <option value="ACCOUNTANT">Phòng Kế toán</option>
+                      <option value="ADMIN">Ban Giám đốc (Admin)</option>
+                      <option value="LANDLORD">Chủ trọ / Đối tác</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Vị trí / Chức danh</label>
+                    <input
+                      placeholder="VD: Chuyên viên Sales"
+                      value={form.position}
+                      onChange={(e) => setForm({ ...form, position: e.target.value })}
+                      className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1">
+                    {form.employmentType === "INTERN" ? "Trợ cấp thực tập (VNĐ)" : "Lương cơ bản (VNĐ)"}
+                  </label>
                   <input
                     type="number"
-                    placeholder={form.employmentType === "INTERN" ? "Trợ cấp thực tập" : "Lương cơ bản"}
+                    placeholder="2000000"
                     value={form.baseSalary}
                     onChange={(e) => setForm({ ...form, baseSalary: e.target.value })}
-                    className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <input
-                    placeholder="Chức danh"
-                    value={form.position}
-                    onChange={(e) => setForm({ ...form, position: e.target.value })}
-                    className="border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
                   />
                 </div>
 
@@ -887,6 +1157,65 @@ export default function EmployeesPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Nộp CV PDF & Trạng thái hồ sơ */}
+                <div className="p-3 rounded-xl bg-amber-50/60 border border-amber-200 space-y-2.5">
+                  <div className="text-xs font-semibold text-neutral-900">Hồ sơ CV (PDF) &amp; Trạng thái xét duyệt</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] text-neutral-600 mb-1">Trạng thái</label>
+                      <select
+                        value={form.recruitmentStatus}
+                        onChange={(e) => setForm({ ...form, recruitmentStatus: e.target.value })}
+                        className="w-full border border-neutral-300 bg-white rounded-lg px-3 py-1.5 text-xs font-medium"
+                      >
+                        {RECRUITMENT_STATUS_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-neutral-600 mb-1">Thời gian phỏng vấn dự kiến</label>
+                      <input
+                        type="datetime-local"
+                        value={form.interviewAt}
+                        onChange={(e) => setForm({ ...form, interviewAt: e.target.value })}
+                        className="w-full border border-neutral-300 bg-white rounded-lg px-2.5 py-1.5 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-neutral-50 border border-neutral-300 text-xs font-medium text-neutral-800 cursor-pointer">
+                      <FileText className="w-3.5 h-3.5 text-rose-600" />
+                      {uploadingCv ? "Đang tải..." : form.cvUrl ? "Đổi CV (PDF)" : "Nộp file CV (PDF)"}
+                      <input
+                        type="file"
+                        accept=".pdf,application/pdf"
+                        onChange={handleFormCvUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    {form.cvUrl && (
+                      <a
+                        href={form.cvUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-semibold text-rose-700 hover:underline truncate max-w-[200px]"
+                        title={cvFileName || "Xem CV PDF"}
+                      >
+                        {cvFileName || "Xem CV đã tải"}
+                      </a>
+                    )}
+                  </div>
+                  <input
+                    placeholder="Ghi chú trạng thái (VD: Hẹn phỏng vấn 14h thứ 5, Chờ kết quả vòng 2...)"
+                    value={form.statusNote}
+                    onChange={(e) => setForm({ ...form, statusNote: e.target.value })}
+                    className="w-full border border-neutral-300 bg-white rounded-lg px-3 py-1.5 text-xs"
+                  />
+                </div>
 
                 <div className="flex justify-end gap-2 pt-2">
                   <button
@@ -1000,40 +1329,122 @@ export default function EmployeesPage() {
         )}
         {/* Modal Cấp quyền riêng theo nhân sự */}
         {permUserModal && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden my-8 shadow-2xl">
-              <div className="px-6 py-4 bg-neutral-950 text-white flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-amber-400">
-                    Cấp quyền riêng: {permUserModal.fullName} ({permUserModal.employeeCode})
-                  </h3>
-                  <p className="text-xs text-neutral-300">
-                    Vai trò gốc: {ROLE_VI_LABELS[permUserModal.role] || permUserModal.role} • Bật/tắt quyền Xem / Thêm / Sửa / Xóa
-                  </p>
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center p-4 pt-6 sm:pt-10 overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-3xl w-full overflow-hidden shadow-[0_25px_70px_-15px_rgba(0,0,0,0.45)] border border-amber-400/50">
+              {/* Luxury Header */}
+              <div className="px-6 py-4 bg-gradient-to-r from-neutral-950 via-neutral-900 to-neutral-950 text-white border-b border-amber-500/30 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-11 h-11 rounded-xl bg-amber-500/15 border border-amber-400/50 flex items-center justify-center shrink-0">
+                    <KeyRound className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-bold text-base text-amber-400 truncate">
+                        Cấp quyền riêng: {permUserModal.fullName}
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-md bg-white/10 border border-white/15 font-mono text-[11px] text-amber-200">
+                        {permUserModal.employeeCode}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-300 mt-0.5">
+                      Phòng ban: <span className="text-white font-medium">{permUserModal.department.name}</span> • Vai trò gốc:{" "}
+                      <span className="text-amber-300 font-medium">
+                        {ROLE_VI_LABELS[permUserModal.role] || permUserModal.role}
+                      </span>
+                    </p>
+                  </div>
                 </div>
-                <button onClick={() => setPermUserModal(null)} className="text-neutral-400 hover:text-white cursor-pointer">
-                  <X className="w-5 h-5" />
+                <button
+                  type="button"
+                  onClick={() => setPermUserModal(null)}
+                  className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-neutral-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                >
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="p-5 max-h-[65vh] overflow-y-auto divide-y divide-neutral-100">
+
+              {/* Quick Actions Bar */}
+              <div className="px-6 py-2.5 bg-amber-50/70 border-b border-amber-200/70 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-neutral-700 font-medium">
+                  Chọn nhanh quyền <strong>Xem • Thêm • Sửa • Xóa</strong> cho từng phân hệ
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allFull: Partial<Record<ModuleKey, PermissionSet>> = {};
+                      for (const m of PERMISSION_MODULES) {
+                        allFull[m.key] = { view: true, create: true, edit: true, delete: true };
+                      }
+                      setUserOverrides((prev) => ({ ...prev, [permUserModal.id]: allFull }));
+                    }}
+                    className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] cursor-pointer transition-colors"
+                  >
+                    ✓ Bật toàn quyền
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allNone: Partial<Record<ModuleKey, PermissionSet>> = {};
+                      for (const m of PERMISSION_MODULES) {
+                        allNone[m.key] = { view: false, create: false, edit: false, delete: false };
+                      }
+                      setUserOverrides((prev) => ({ ...prev, [permUserModal.id]: allNone }));
+                    }}
+                    className="px-2.5 py-1 rounded-md bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 font-semibold text-[11px] cursor-pointer transition-colors"
+                  >
+                    Tắt tất cả
+                  </button>
+                </div>
+              </div>
+
+              {/* Module List */}
+              <div className="p-4 sm:p-5 max-h-[58vh] overflow-y-auto space-y-2.5 bg-neutral-50/50">
                 {PERMISSION_MODULES.map((m) => {
                   const roleKey = (permUserModal.role as RoleKey) || "SALES";
                   const cell =
                     userOverrides[permUserModal.id]?.[m.key] ||
                     permMatrix[roleKey]?.[m.key] || { view: false, create: false, edit: false, delete: false };
+                  const allOn = cell.view && cell.create && cell.edit && cell.delete;
                   return (
-                    <div key={m.key} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <div className="font-semibold text-sm text-neutral-900">{m.label}</div>
-                        <div className="text-[11px] text-neutral-500">{m.desc}</div>
+                    <div
+                      key={m.key}
+                      className="p-3.5 rounded-xl bg-white border border-neutral-200/90 hover:border-amber-300 transition-all shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-neutral-900">{m.label}</span>
+                          {allOn && (
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">
+                              Toàn quyền
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-neutral-500 mt-0.5">{m.desc}</div>
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                         {(
                           [
-                            { k: "view", label: "Xem", on: "bg-emerald-50 text-emerald-700 border-emerald-300" },
-                            { k: "create", label: "Thêm", on: "bg-amber-50 text-amber-800 border-amber-300" },
-                            { k: "edit", label: "Sửa", on: "bg-sky-50 text-sky-700 border-sky-300" },
-                            { k: "delete", label: "Xóa", on: "bg-rose-50 text-rose-700 border-rose-300" },
+                            {
+                              k: "view",
+                              label: "Xem",
+                              on: "bg-emerald-50 text-emerald-700 border-emerald-400 shadow-2xs",
+                            },
+                            {
+                              k: "create",
+                              label: "Thêm",
+                              on: "bg-amber-50 text-amber-800 border-amber-400 shadow-2xs",
+                            },
+                            {
+                              k: "edit",
+                              label: "Sửa",
+                              on: "bg-sky-50 text-sky-700 border-sky-400 shadow-2xs",
+                            },
+                            {
+                              k: "delete",
+                              label: "Xóa",
+                              on: "bg-rose-50 text-rose-700 border-rose-400 shadow-2xs",
+                            },
                           ] as const
                         ).map((btn) => {
                           const active = cell[btn.k];
@@ -1042,10 +1453,10 @@ export default function EmployeesPage() {
                               key={btn.k}
                               type="button"
                               onClick={() => toggleUserOverridePerm(permUserModal.id, roleKey, m.key, btn.k)}
-                              className={`px-2.5 py-1 rounded-md text-xs font-semibold border cursor-pointer ${
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                                 active
                                   ? btn.on
-                                  : "bg-white text-neutral-400 border-neutral-200 hover:bg-neutral-50"
+                                  : "bg-neutral-50 text-neutral-400 border-neutral-200 hover:bg-neutral-100 hover:text-neutral-600"
                               }`}
                             >
                               {active ? "✓ " : ""}
@@ -1053,12 +1464,31 @@ export default function EmployeesPage() {
                             </button>
                           );
                         })}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextVal = !allOn;
+                            setUserOverrides((prev) => ({
+                              ...prev,
+                              [permUserModal.id]: {
+                                ...(prev[permUserModal.id] || {}),
+                                [m.key]: { view: nextVal, create: nextVal, edit: nextVal, delete: nextVal },
+                              },
+                            }));
+                          }}
+                          className="ml-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-neutral-500 hover:text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+                          title={allOn ? "Tắt hết mục này" : "Bật hết mục này"}
+                        >
+                          {allOn ? "Tắt" : "Hết"}
+                        </button>
                       </div>
                     </div>
                   );
                 })}
               </div>
-              <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-200 flex items-center justify-between gap-2">
+
+              {/* Footer */}
+              <div className="px-6 py-4 bg-white border-t border-neutral-200 flex flex-wrap items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -1068,15 +1498,15 @@ export default function EmployeesPage() {
                       return copy;
                     });
                   }}
-                  className="px-3 py-1.5 rounded-lg border border-neutral-300 text-xs font-medium text-neutral-700 hover:bg-white cursor-pointer"
+                  className="px-3.5 py-2 rounded-lg border border-neutral-300 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 inline-flex items-center gap-1.5 cursor-pointer"
                 >
-                  Đặt lại theo vai trò
+                  <RotateCcw className="w-3.5 h-3.5" /> Đặt lại theo vai trò
                 </button>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setPermUserModal(null)}
-                    className="px-4 py-2 rounded-lg border border-neutral-300 text-xs font-medium cursor-pointer"
+                    className="px-4 py-2 rounded-lg border border-neutral-300 hover:bg-neutral-50 text-xs font-semibold text-neutral-700 cursor-pointer"
                   >
                     Đóng
                   </button>
@@ -1087,9 +1517,9 @@ export default function EmployeesPage() {
                       await savePermissions(permUserModal.id);
                       setPermUserModal(null);
                     }}
-                    className="px-4 py-2 rounded-lg bg-neutral-950 text-amber-400 border border-amber-500 text-xs font-bold cursor-pointer disabled:opacity-50"
+                    className="px-5 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-amber-400 border border-amber-500 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
-                    {savingPerms ? "Đang lưu..." : "Lưu quyền nhân sự"}
+                    <Save className="w-3.5 h-3.5" /> {savingPerms ? "Đang lưu..." : "Lưu quyền nhân sự"}
                   </button>
                 </div>
               </div>

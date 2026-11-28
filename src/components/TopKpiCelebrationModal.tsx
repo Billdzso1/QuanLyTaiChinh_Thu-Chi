@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useRef, useState } from "react";
 import { Crown, Gift, Sparkles, Trophy, X, RotateCw } from "lucide-react";

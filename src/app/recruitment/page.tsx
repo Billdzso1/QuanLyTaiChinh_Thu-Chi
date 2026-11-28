@@ -435,6 +435,42 @@ export default function RecruitmentDirectorPage() {
           </div>
         </div>
 
+        {/* Lịch hẹn phỏng vấn ứng viên */}
+        {applications.some((a) => a.interviewDate || a.status === "INTERVIEWING") && (
+          <div className="bg-gradient-to-r from-sky-50 via-white to-amber-50/70 border border-sky-200 border-l-4 border-l-sky-500 rounded-xl p-4 space-y-2.5 shadow-2xs">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-bold text-sm text-neutral-950">
+                📅 Lịch hẹn phỏng vấn ứng viên (
+                {applications.filter((a) => a.interviewDate || a.status === "INTERVIEWING").length})
+              </div>
+              <span className="text-[11px] text-sky-800 font-medium">Bấm vào thẻ để xem chi tiết hồ sơ</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {applications
+                .filter((a) => a.interviewDate || a.status === "INTERVIEWING")
+                .map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => setSelectedApp(a)}
+                    className="text-left p-3 rounded-lg bg-white border border-sky-100 hover:border-sky-300 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-xs text-neutral-900 truncate">{a.fullName}</span>
+                      <span className="font-mono text-[10px] font-bold text-amber-700">{a.code}</span>
+                    </div>
+                    <div className="text-[11px] text-neutral-500 truncate mt-0.5">
+                      {a.position} • {a.departmentCode}
+                    </div>
+                    <div className="text-[11px] font-semibold text-sky-700 mt-1">
+                      {a.interviewDate ? `🕒 Hẹn PV: ${formatDate(a.interviewDate)}` : "⏳ Đang chờ xếp lịch PV"}
+                    </div>
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
+
         {tab === "APPLICATIONS" && (
           <div className="space-y-3">
             <div className="flex flex-wrap gap-1.5">
@@ -842,7 +878,7 @@ export default function RecruitmentDirectorPage() {
         {/* Modal Chi tiết & Chỉnh lương thành viên (Chính thức & Thực tập sinh) */}
         {selectedMember && (
           <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 overflow-y-auto" onClick={() => setSelectedMember(null)}>
-            <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-4 my-8 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-4 max-h-[88vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-neutral-200 pb-3">
                 <div>
                   <h3 className="text-lg font-bold text-neutral-950">

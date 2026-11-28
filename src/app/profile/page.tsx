@@ -98,23 +98,23 @@ export default function ProfilePage() {
         </div>
 
         {user && (
-          <div className="bg-white rounded-xl border border-neutral-200 p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <div className="text-xs text-neutral-500">Họ và tên</div>
-              <div className="font-bold text-neutral-900 text-lg">{user.fullName}</div>
-              <div className="text-xs text-amber-600 font-medium">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-5 rounded-xl border border-neutral-200 border-l-4 border-l-amber-500 bg-gradient-to-br from-white to-amber-50/80 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-lg">
+              <div className="text-xs font-semibold text-neutral-500">Họ và tên</div>
+              <div className="font-bold text-neutral-900 text-lg mt-1">{user.fullName}</div>
+              <div className="text-xs text-amber-700 font-semibold mt-0.5">
                 {user.employeeCode} • {user.position}
               </div>
             </div>
-            <div>
-              <div className="text-xs text-neutral-500">Phòng ban & Email</div>
-              <div className="font-medium text-neutral-800">{user.department.name}</div>
-              <div className="text-xs text-neutral-500">{user.email}</div>
+            <div className="p-5 rounded-xl border border-neutral-200 border-l-4 border-l-sky-500 bg-gradient-to-br from-white to-sky-50/70 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-lg">
+              <div className="text-xs font-semibold text-neutral-500">Phòng ban &amp; Email</div>
+              <div className="font-bold text-sky-800 text-base mt-1">{user.department.name}</div>
+              <div className="text-xs text-neutral-600 mt-0.5">{user.email}</div>
             </div>
-            <div>
-              <div className="text-xs text-neutral-500">Lương cơ bản / Phụ cấp</div>
-              <div className="font-semibold text-neutral-900">
-                {formatVND(user.baseSalary)} / {formatVND(user.allowance)}
+            <div className="p-5 rounded-xl border border-neutral-200 border-l-4 border-l-emerald-500 bg-gradient-to-br from-white to-emerald-50/70 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-lg">
+              <div className="text-xs font-semibold text-neutral-500">Lương cơ bản / Phụ cấp</div>
+              <div className="font-bold text-emerald-700 text-lg mt-1 tabular-nums">
+                {formatVND(user.baseSalary)} <span className="text-xs font-normal text-neutral-500">/ {formatVND(user.allowance)}</span>
               </div>
             </div>
           </div>
@@ -122,34 +122,34 @@ export default function ProfilePage() {
 
         {/* Current Month Salary */}
         {currentPayroll && (
-          <div className="bg-white rounded-xl border border-neutral-200 p-5 space-y-4">
+          <div className="bg-white rounded-xl border border-neutral-200 p-5 space-y-4 shadow-2xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 font-semibold text-neutral-900">
                 <BadgeDollarSign className="w-5 h-5 text-emerald-600" /> Tổng quan lương tháng {currentPayroll.month}/
                 {currentPayroll.year}
               </div>
-              <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold">
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold">
                 {getStatusLabel(currentPayroll.status)}
               </span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="p-3 rounded-lg bg-neutral-50">
-                <div className="text-xs text-neutral-500">Lương cơ bản</div>
-                <div className="font-bold text-neutral-900 mt-1">{formatVND(currentPayroll.baseSalary)}</div>
+              <div className="p-4 rounded-xl border border-neutral-200 border-l-4 border-l-sky-500 bg-gradient-to-br from-white to-sky-50/70 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-lg">
+                <div className="text-xs font-medium text-neutral-600">Lương cơ bản</div>
+                <div className="font-bold text-sky-700 text-lg mt-1 tabular-nums">{formatVND(currentPayroll.baseSalary)}</div>
               </div>
-              <div className="p-3 rounded-lg bg-neutral-50">
-                <div className="text-xs text-neutral-500">Hoa hồng ({(currentPayroll.commissionRate * 100).toFixed(0)}%)</div>
-                <div className="font-bold text-amber-600 mt-1">{formatVND(currentPayroll.commissionAmount)}</div>
+              <div className="p-4 rounded-xl border border-neutral-200 border-l-4 border-l-amber-500 bg-gradient-to-br from-white to-amber-50/80 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-lg">
+                <div className="text-xs font-medium text-neutral-600">Hoa hồng ({(currentPayroll.commissionRate * 100).toFixed(0)}%)</div>
+                <div className="font-bold text-amber-700 text-lg mt-1 tabular-nums">{formatVND(currentPayroll.commissionAmount)}</div>
               </div>
-              <div className="p-3 rounded-lg bg-neutral-50">
-                <div className="text-xs text-neutral-500">Phụ cấp & Thưởng</div>
-                <div className="font-bold text-neutral-900 mt-1">
+              <div className="p-4 rounded-xl border border-neutral-200 border-l-4 border-l-violet-500 bg-gradient-to-br from-white to-violet-50/70 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-lg">
+                <div className="text-xs font-medium text-neutral-600">Phụ cấp &amp; Thưởng</div>
+                <div className="font-bold text-violet-700 text-lg mt-1 tabular-nums">
                   {formatVND(currentPayroll.allowance + currentPayroll.bonus)}
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-emerald-50">
-                <div className="text-xs text-emerald-700 font-medium">Tổng lương thực nhận</div>
-                <div className="font-bold text-emerald-700 text-lg mt-1">{formatVND(currentPayroll.netSalary)}</div>
+              <div className="p-4 rounded-xl border border-neutral-200 border-l-4 border-l-emerald-500 bg-gradient-to-br from-white to-emerald-50/80 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-lg">
+                <div className="text-xs text-emerald-700 font-semibold">Tổng lương thực nhận</div>
+                <div className="font-bold text-emerald-700 text-lg mt-1 tabular-nums">{formatVND(currentPayroll.netSalary)}</div>
               </div>
             </div>
           </div>
@@ -157,7 +157,7 @@ export default function ProfilePage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Notifications */}
-          <div className="bg-white rounded-xl border border-neutral-200 p-5 space-y-3">
+          <div className="bg-white rounded-xl border border-neutral-200 border-t-4 border-t-amber-500 p-5 space-y-3 transition-all duration-300 hover:shadow-lg">
             <div className="flex items-center gap-2 font-semibold text-neutral-900">
               <Bell className="w-5 h-5 text-amber-600" /> Thông báo nội bộ
             </div>
@@ -166,7 +166,7 @@ export default function ProfilePage() {
                 <div className="text-sm text-neutral-400 py-4">Không có thông báo mới.</div>
               ) : (
                 notifications.map((n) => (
-                  <div key={n.id} className="py-3">
+                  <div key={n.id} className="py-3 hover:bg-amber-50/30 px-2 rounded-lg transition-colors">
                     <div className="font-medium text-sm text-neutral-900">{n.title}</div>
                     <div className="text-xs text-neutral-500 mt-0.5">{n.message}</div>
                   </div>
@@ -176,7 +176,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Change Password */}
-          <div className="bg-white rounded-xl border border-neutral-200 p-5 space-y-4">
+          <div className="bg-white rounded-xl border border-neutral-200 border-t-4 border-t-sky-500 p-5 space-y-4 transition-all duration-300 hover:shadow-lg">
             <div className="flex items-center gap-2 font-semibold text-neutral-900">
               <KeyRound className="w-5 h-5 text-amber-600" /> Đổi mật khẩu
             </div>
