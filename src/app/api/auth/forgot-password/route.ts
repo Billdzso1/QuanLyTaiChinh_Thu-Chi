@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
+import { getKvJsonWithFallback, setKvJson } from "@/lib/dbStore";
 
 interface OtpEntry {
   email: string;
@@ -13,6 +13,7 @@ interface OtpEntry {
 }
 
 const OTP_FILE = path.join(process.cwd(), "data", "password-reset-otps.json");
+const OTP_KV_KEY = "password_reset_otps";
 
 function normalizeStr(s: string): string {
   return s
@@ -23,17 +24,11 @@ function normalizeStr(s: string): string {
 }
 
 async function readOtps(): Promise<Record<string, OtpEntry>> {
-  try {
-    const raw = await readFile(OTP_FILE, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
+  return getKvJsonWithFallback<Record<string, OtpEntry>>(OTP_KV_KEY, OTP_FILE, {});
 }
 
 async function saveOtps(data: Record<string, OtpEntry>) {
-  await mkdir(path.dirname(OTP_FILE), { recursive: true });
-  await writeFile(OTP_FILE, JSON.stringify(data, null, 2), "utf-8");
+  await setKvJson(OTP_KV_KEY, data);
 }
 
 export async function GET() {

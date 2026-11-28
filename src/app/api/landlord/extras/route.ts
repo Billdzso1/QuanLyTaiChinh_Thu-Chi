@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/permissionsServer";
+import { getKvJsonWithFallback, setKvJson } from "@/lib/dbStore";
 
 export interface UtilityBillRecord {
   id: string;
@@ -81,18 +81,16 @@ const RESIDENTS_FILE = path.join(process.cwd(), "data", "landlord-residents.json
 const RATES_FILE = path.join(process.cwd(), "data", "landlord-rates.json");
 const EXPENSES_FILE = path.join(process.cwd(), "data", "landlord-expenses.json");
 
+function getLandlordKvKey(filePath: string): string {
+  return `landlord_${path.basename(filePath, ".json")}`;
+}
+
 async function readJsonArray<T>(filePath: string): Promise<T[]> {
-  try {
-    const raw = await readFile(filePath, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
+  return getKvJsonWithFallback<T[]>(getLandlordKvKey(filePath), filePath, []);
 }
 
 async function writeJsonArray<T>(filePath: string, data: T[]) {
-  await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
+  await setKvJson(getLandlordKvKey(filePath), data);
 }
 
 export async function GET() {

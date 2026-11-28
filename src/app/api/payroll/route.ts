@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { getCurrentUser, canAccessFinance, UserRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -7,23 +6,19 @@ import { calculateSalesCommission, generateCode } from "@/lib/finance";
 import { readContractSplits, allocateContractRevenue } from "@/lib/contractSplits";
 import { logAudit } from "@/lib/audit";
 import { requirePermission } from "@/lib/permissionsServer";
+import { getKvJsonWithFallback, setKvJson } from "@/lib/dbStore";
 
 const PAYROLL_DOCS_FILE = path.join(process.cwd(), "data", "payroll-docs.json");
+const PAYROLL_DOCS_KV_KEY = "payroll_signed_docs";
 
 async function getPayrollDocs(): Promise<Record<string, string>> {
-  try {
-    const raw = await readFile(PAYROLL_DOCS_FILE, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
+  return getKvJsonWithFallback<Record<string, string>>(PAYROLL_DOCS_KV_KEY, PAYROLL_DOCS_FILE, {});
 }
 
 async function setPayrollDoc(key: string, url: string) {
   const docs = await getPayrollDocs();
   docs[key] = url;
-  await mkdir(path.dirname(PAYROLL_DOCS_FILE), { recursive: true });
-  await writeFile(PAYROLL_DOCS_FILE, JSON.stringify(docs, null, 2), "utf-8");
+  await setKvJson(PAYROLL_DOCS_KV_KEY, docs);
 }
 
 export async function GET(request: Request) {

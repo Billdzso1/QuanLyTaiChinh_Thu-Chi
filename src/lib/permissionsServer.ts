@@ -1,6 +1,6 @@
-import { readFile } from "fs/promises";
 import path from "path";
 import { NextResponse } from "next/server";
+import { getKvJsonWithFallback } from "./dbStore";
 import {
   getDefaultPermissionMatrix,
   ModuleKey,
@@ -12,22 +12,19 @@ import {
 } from "./permissions";
 
 const PERMISSIONS_FILE = path.join(process.cwd(), "data", "permissions-matrix.json");
+export const PERMISSIONS_KV_KEY = "permissions_matrix";
 
 export async function readPermissionConfig(): Promise<PermissionConfigData> {
   const defaults = getDefaultPermissionMatrix();
-  try {
-    const raw = await readFile(PERMISSIONS_FILE, "utf-8");
-    const parsed = JSON.parse(raw) as Partial<PermissionConfigData>;
-    return {
-      matrix: { ...defaults, ...(parsed.matrix || {}) },
-      userOverrides: parsed.userOverrides || {},
-    };
-  } catch {
-    return {
-      matrix: defaults,
-      userOverrides: {},
-    };
-  }
+  const parsed = await getKvJsonWithFallback<Partial<PermissionConfigData>>(
+    PERMISSIONS_KV_KEY,
+    PERMISSIONS_FILE,
+    {}
+  );
+  return {
+    matrix: { ...defaults, ...(parsed.matrix || {}) },
+    userOverrides: parsed.userOverrides || {},
+  };
 }
 
 export async function getEffectivePermissions(

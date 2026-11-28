@@ -1,5 +1,5 @@
-import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { getKvJsonWithFallback, setKvJson } from "./dbStore";
 
 export interface ContractSplitRecord {
   contractId: string;
@@ -10,21 +10,16 @@ export interface ContractSplitRecord {
 }
 
 const SPLITS_FILE = path.join(process.cwd(), "data", "contract-splits.json");
+const SPLITS_KV_KEY = "contract_splits";
 
 export async function readContractSplits(): Promise<Record<string, ContractSplitRecord>> {
-  try {
-    const raw = await readFile(SPLITS_FILE, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
+  return getKvJsonWithFallback<Record<string, ContractSplitRecord>>(SPLITS_KV_KEY, SPLITS_FILE, {});
 }
 
 export async function saveContractSplit(record: ContractSplitRecord) {
   const all = await readContractSplits();
   all[record.contractId] = record;
-  await mkdir(path.dirname(SPLITS_FILE), { recursive: true });
-  await writeFile(SPLITS_FILE, JSON.stringify(all, null, 2), "utf-8");
+  await setKvJson(SPLITS_KV_KEY, all);
 }
 
 export function allocateContractRevenue(

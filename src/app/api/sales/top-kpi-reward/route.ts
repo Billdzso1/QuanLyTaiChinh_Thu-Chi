@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { readContractSplits, allocateContractRevenue } from "@/lib/contractSplits";
+import { getKvJsonWithFallback, setKvJson } from "@/lib/dbStore";
 
 interface KpiPrize {
   id: string;
@@ -103,19 +103,14 @@ interface RewardRecord {
 }
 
 const REWARDS_FILE = path.join(process.cwd(), "data", "kpi-rewards.json");
+const REWARDS_KV_KEY = "kpi_rewards";
 
 async function readRewards(): Promise<Record<string, RewardRecord>> {
-  try {
-    const raw = await readFile(REWARDS_FILE, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
+  return getKvJsonWithFallback<Record<string, RewardRecord>>(REWARDS_KV_KEY, REWARDS_FILE, {});
 }
 
 async function saveRewards(data: Record<string, RewardRecord>) {
-  await mkdir(path.dirname(REWARDS_FILE), { recursive: true });
-  await writeFile(REWARDS_FILE, JSON.stringify(data, null, 2), "utf-8");
+  await setKvJson(REWARDS_KV_KEY, data);
 }
 
 async function getTopSalesInfo(userId: string) {

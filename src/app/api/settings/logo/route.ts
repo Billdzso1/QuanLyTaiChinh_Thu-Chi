@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
-import { writeFile, readFile, mkdir } from "fs/promises";
+import { readFile } from "fs/promises";
 import path from "path";
 import { getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { getDbFile, getKvJsonWithFallback, saveDbFile, setKvJson } from "@/lib/dbStore";
 
 const LOGO_DIR = path.join(process.cwd(), "data", "logo");
 const CONFIG_FILE = path.join(LOGO_DIR, "config.json");
+const LOGO_CONFIG_KV_KEY = "company_logo_config";
 
 interface LogoConfig {
   fileName?: string | null;
@@ -15,12 +17,7 @@ interface LogoConfig {
 }
 
 async function getConfig(): Promise<LogoConfig> {
-  try {
-    const raw = await readFile(CONFIG_FILE, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
+  return getKvJsonWithFallback<LogoConfig>(LOGO_CONFIG_KV_KEY, CONFIG_FILE, {});
 }
 
 export async function GET(request: Request) {
@@ -30,6 +27,19 @@ export async function GET(request: Request) {
   if (searchParams.get("raw") === "1") {
     if (!cfg.fileName) {
       return new NextResponse("Not found", { status: 404 });
+    }
+    try {
+      const dbFile = await getDbFile(cfg.fileName);
+      if (dbFile) {
+        return new NextResponse(new Uint8Array(dbFile.data), {
+          headers: {
+            "Content-Type": dbFile.mimeType || cfg.mimeType || "image/png",
+            "Cache-Control": "no-store",
+          },
+        });
+      }
+    } catch {
+      // Fallback to local filesystem below
     }
     try {
       const bytes = await readFile(path.join(LOGO_DIR, cfg.fileName));
@@ -57,7 +67,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Chỉ Giám đốc mới có quyền thay đổi logo công ty" }, { status: 403 });
   }
 
-  await mkdir(LOGO_DIR, { recursive: true });
   const contentType = request.headers.get("content-type") || "";
   const updatedAt = Date.now();
 
@@ -73,8 +82,9 @@ export async function POST(request: Request) {
     const ext = path.extname(file.name) || ".png";
     const fileName = `company-logo-${updatedAt}${ext}`;
     const bytes = await file.arrayBuffer();
-    await writeFile(path.join(LOGO_DIR, fileName), Buffer.from(bytes));
-    newConfig = { fileName, mimeType: file.type || "image/png", externalUrl: null, updatedAt };
+    const mimeType = file.type || "image/png";
+    await saveDbFile(fileName, mimeType, Buffer.from(bytes));
+    newConfig = { fileName, mimeType, externalUrl: null, updatedAt };
     logoUrl = `/api/settings/logo?raw=1&v=${updatedAt}`;
   } else {
     const body = await request.json();
@@ -83,7 +93,7 @@ export async function POST(request: Request) {
     logoUrl = url;
   }
 
-  await writeFile(CONFIG_FILE, JSON.stringify(newConfig, null, 2), "utf-8");
+  await setKvJson(LOGO_CONFIG_KV_KEY, newConfig);
   await logAudit({
     userId: user.id,
     action: "UPDATE_COMPANY_LOGO",

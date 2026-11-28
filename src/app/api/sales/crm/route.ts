@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission, requirePermission } from "@/lib/permissionsServer";
+import { getKvJsonWithFallback, setKvJson } from "@/lib/dbStore";
 
 interface RoomViewingRecord {
   id: string;
@@ -32,19 +32,14 @@ interface RoomViewingRecord {
 }
 
 const VIEWINGS_FILE = path.join(process.cwd(), "data", "room-viewings.json");
+const VIEWINGS_KV_KEY = "room_viewings";
 
 async function readViewings(): Promise<RoomViewingRecord[]> {
-  try {
-    const raw = await readFile(VIEWINGS_FILE, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
+  return getKvJsonWithFallback<RoomViewingRecord[]>(VIEWINGS_KV_KEY, VIEWINGS_FILE, []);
 }
 
 async function saveViewings(items: RoomViewingRecord[]) {
-  await mkdir(path.dirname(VIEWINGS_FILE), { recursive: true });
-  await writeFile(VIEWINGS_FILE, JSON.stringify(items, null, 2), "utf-8");
+  await setKvJson(VIEWINGS_KV_KEY, items);
 }
 
 function maskPhone(phone?: string | null): string {

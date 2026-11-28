@@ -1,3 +1,4 @@
+import { readFile } from "fs/promises";
 import { prisma } from "./prisma";
 
 let kvInitPromise: Promise<void> | null = null;
@@ -67,6 +68,28 @@ export async function setKvJson<T>(key: string, value: T): Promise<void> {
     key,
     serialized
   );
+}
+
+export async function getKvJsonWithFallback<T>(
+  key: string,
+  fallbackFilePath: string,
+  defaultValue: T
+): Promise<T> {
+  try {
+    const dbVal = await getKvJson<T>(key);
+    if (dbVal !== null) return dbVal;
+  } catch {
+    // Fallback to seed file below
+  }
+
+  try {
+    const raw = await readFile(fallbackFilePath, "utf-8");
+    const parsed = JSON.parse(raw) as T;
+    await setKvJson(key, parsed).catch(() => undefined);
+    return parsed;
+  } catch {
+    return defaultValue;
+  }
 }
 
 export async function saveDbFile(fileName: string, mimeType: string, data: Buffer): Promise<void> {

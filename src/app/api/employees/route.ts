@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import bcrypt from "bcryptjs";
 import { getCurrentUser } from "@/lib/auth";
@@ -7,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { notifyInterviewSchedule } from "@/lib/interviewNotify";
 import { requirePermission } from "@/lib/permissionsServer";
+import { getKvJsonWithFallback, setKvJson } from "@/lib/dbStore";
 
 interface EmployeeExtraProfile {
   cvUrl?: string | null;
@@ -16,19 +16,18 @@ interface EmployeeExtraProfile {
 }
 
 const PROFILES_FILE = path.join(process.cwd(), "data", "employee-profiles.json");
+const PROFILES_KV_KEY = "employee_extra_profiles";
 
 async function readExtraProfiles(): Promise<Record<string, EmployeeExtraProfile>> {
-  try {
-    const raw = await readFile(PROFILES_FILE, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
+  return getKvJsonWithFallback<Record<string, EmployeeExtraProfile>>(
+    PROFILES_KV_KEY,
+    PROFILES_FILE,
+    {}
+  );
 }
 
 async function saveExtraProfiles(data: Record<string, EmployeeExtraProfile>) {
-  await mkdir(path.dirname(PROFILES_FILE), { recursive: true });
-  await writeFile(PROFILES_FILE, JSON.stringify(data, null, 2), "utf-8");
+  await setKvJson(PROFILES_KV_KEY, data);
 }
 
 export async function GET() {

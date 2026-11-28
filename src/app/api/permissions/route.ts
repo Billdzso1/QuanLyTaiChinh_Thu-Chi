@@ -1,35 +1,12 @@
 import { NextResponse } from "next/server";
-import { readFile, writeFile, mkdir } from "fs/promises";
-import path from "path";
 import { getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import {
-  getDefaultPermissionMatrix,
-  PermissionConfigData,
-} from "@/lib/permissions";
-
-const PERMISSIONS_FILE = path.join(process.cwd(), "data", "permissions-matrix.json");
-
-async function readPermissionConfig(): Promise<PermissionConfigData> {
-  const defaults = getDefaultPermissionMatrix();
-  try {
-    const raw = await readFile(PERMISSIONS_FILE, "utf-8");
-    const parsed = JSON.parse(raw) as Partial<PermissionConfigData>;
-    return {
-      matrix: { ...defaults, ...(parsed.matrix || {}) },
-      userOverrides: parsed.userOverrides || {},
-    };
-  } catch {
-    return {
-      matrix: defaults,
-      userOverrides: {},
-    };
-  }
-}
+import { setKvJson } from "@/lib/dbStore";
+import { PERMISSIONS_KV_KEY, readPermissionConfig } from "@/lib/permissionsServer";
+import { PermissionConfigData } from "@/lib/permissions";
 
 async function savePermissionConfig(data: PermissionConfigData) {
-  await mkdir(path.dirname(PERMISSIONS_FILE), { recursive: true });
-  await writeFile(PERMISSIONS_FILE, JSON.stringify(data, null, 2), "utf-8");
+  await setKvJson(PERMISSIONS_KV_KEY, data);
 }
 
 export async function GET() {
